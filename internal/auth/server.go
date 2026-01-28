@@ -1,0 +1,228 @@
+package auth
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+)
+
+// Server manages the GoTrue auth server subprocess
+type Server struct {
+	config Config
+	cmd    *exec.Cmd
+	mu     sync.RWMutex
+	running bool
+	ready   bool
+	cancel  context.CancelFunc
+}
+
+// NewServer creates a new GoTrue server instance
+func NewServer(cfg Config) *Server {
+	return &Server{
+		config: cfg,
+		running: false,
+		ready: false,
+	}
+}
+
+// Start launches the GoTrue server as a subprocess
+func (s *Server) Start(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.running {
+		return fmt.Errorf("server already running")
+	}
+
+	// Find the GoTrue binary
+	binaryPath, err := findGoTrueBinary()
+	if err != nil {
+		return fmt.Errorf("failed to find GoTrue binary: %w", err)
+	}
+
+	// Create a context for the subprocess
+	ctx, s.cancel = context.WithCancel(ctx)
+
+	// Prepare environment variables
+	env := s.buildEnv()
+
+	// Build the command
+	s.cmd = exec.CommandContext(ctx, binaryPath)
+	s.cmd.Env = append(os.Environ(), env...)
+	s.cmd.Dir = filepath.Dir(binaryPath)
+
+	// Capture stdout and stderr
+	stdout, err := s.cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	stderr, err := s.cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
+	// Start the command
+	if err := s.cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start GoTrue: %w", err)
+	}
+
+	s.running = true
+
+	// Start goroutines to monitor output
+	go s.monitorOutput(stdout)
+	go s.monitorOutput(stderr)
+
+	// Wait for the server to be ready
+	go s.waitReady()
+
+	return nil
+}
+
+// Stop gracefully stops the GoTrue server
+func (s *Server) Stop() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.running {
+		return nil
+	}
+
+	if s.cancel != nil {
+		s.cancel()
+	}
+
+	s.running = false
+	s.ready = false
+
+	return nil
+}
+
+// IsRunning returns true if the server is currently running
+func (s *Server) IsRunning() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.running && s.ready
+}
+
+// buildEnv constructs the environment variables for GoTrue
+func (s *Server) buildEnv() []string {
+	var env []string
+
+	// Database connection
+	env = append(env, fmt.Sprintf("DATABASE_URL=%s", s.config.ConnString))
+
+	// JWT configuration
+	env = append(env, fmt.Sprintf("JWT_SECRET=%s", s.config.JWTSecret))
+
+	// Site configuration
+	env = append(env, fmt.Sprintf("SITE_URL=%s", s.config.SiteURL))
+
+	// API configuration
+	if s.config.URI != "" {
+		env = append(env, fmt.Sprintf("URI=%s", s.config.URI))
+	}
+
+	if s.config.Port != 0 {
+		env = append(env, fmt.Sprintf("PORT=%d", s.config.Port))
+	}
+
+	// Logging
+	if s.config.LogLevel != "" {
+		env = append(env, fmt.Sprintf("LOG_LEVEL=%s", s.config.LogLevel))
+	}
+
+	// Operator token
+	if s.config.OperatorToken != "" {
+		env = append(env, fmt.Sprintf("OPERATOR_TOKEN=%s", s.config.OperatorToken))
+	}
+
+	// Database startup retries
+	if s.config.DBStartupAttempts > 0 {
+		env = append(env, fmt.Sprintf("DB_AUTOMIGRATE=true"))
+		env = append(env, fmt.Sprintf("DB_STARTUP_ATTEMPTS=%d", s.config.DBStartupAttempts))
+	}
+
+	if s.config.DBStartupDelay > 0 {
+		env = append(env, fmt.Sprintf("DB_STARTUP_DELAY=%d", int(s.config.DBStartupDelay.Seconds())))
+	}
+
+	return env
+}
+
+// findGoTrueBinary searches for the GoTrue binary in various locations
+func findGoTrueBinary() (string, error) {
+	// List of locations to search
+	searchPaths := []string{
+		"./bin/gotrue",
+		"./gotrue",
+		"/usr/local/bin/gotrue",
+		"/usr/bin/gotrue",
+	}
+
+	// Also search in PATH
+	if path := os.Getenv("PATH"); path != "" {
+		searchPaths = append(searchPaths, strings.Split(path, ":")...)
+	}
+
+	for _, path := range searchPaths {
+		if path == "" {
+			continue
+		}
+
+		// Check if the path is executable
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			// Check if it's executable
+			if info.Mode().Perm()&0111 != 0 {
+				return filepath.Abs(path)
+			}
+		}
+	}
+
+	return "", fmt.Errorf("GoTrue binary not found in search paths: %v", searchPaths)
+}
+
+// waitReady polls the health endpoint until the server is ready
+func (s *Server) waitReady() {
+	client := &http.Client{
+		Timeout: 1 * time.Second,
+	}
+
+	healthURL := fmt.Sprintf("http://localhost:%d/health", s.config.Port)
+
+	for i := 0; i < 30; i++ {
+		time.Sleep(500 * time.Millisecond)
+
+		resp, err := client.Get(healthURL)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == 200 {
+				s.mu.Lock()
+				s.ready = true
+				s.mu.Unlock()
+				return
+			}
+		}
+	}
+
+	// If we get here, the server never became ready
+	// This is OK for now - the binary might not be installed
+}
+
+// monitorOutput reads and logs subprocess output
+func (s *Server) monitorOutput(r io.Reader) {
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// In a real implementation, this would go to a logger
+		fmt.Printf("[GoTrue] %s\n", line)
+	}
+}
