@@ -5,7 +5,7 @@ VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
-LDFLAGS=-ldflags "-X github.com/markb/supalite/cmd.Version=$(VERSION)" -ldflags "-X github.com/markb/supalite/cmd.BuildTime=$(BUILD_TIME)" -ldflags "-X github.com/markb/supalite/cmd.GitCommit=$(GIT_COMMIT)"
+LDFLAGS=-ldflags "-X github.com/markb/supalite/cmd.Version=$(VERSION) -X github.com/markb/supalite/cmd.BuildTime=$(BUILD_TIME) -X github.com/markb/supalite/cmd.GitCommit=$(GIT_COMMIT)"
 
 build:
 	go build $(LDFLAGS) -o $(BINARY) .
