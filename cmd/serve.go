@@ -12,12 +12,15 @@ import (
 )
 
 var serveConfig struct {
-	host      string
-	port      int
-	pgPort    uint16
-	dataDir   string
-	jwtSecret string
-	siteURL   string
+	host       string
+	port       int
+	pgPort     uint16
+	dataDir    string
+	jwtSecret  string
+	siteURL    string
+	pgUsername string
+	pgPassword string
+	pgDatabase string
 }
 
 var serveCmd = &cobra.Command{
@@ -43,12 +46,15 @@ The server orchestrates all components and provides a unified API endpoint.`,
 
 		// Create server configuration
 		cfg := server.Config{
-			Host:      serveConfig.host,
-			Port:      serveConfig.port,
-			PGPort:    serveConfig.pgPort,
-			DataDir:   serveConfig.dataDir,
-			JWTSecret: serveConfig.jwtSecret,
-			SiteURL:   serveConfig.siteURL,
+			Host:       serveConfig.host,
+			Port:       serveConfig.port,
+			PGPort:     serveConfig.pgPort,
+			DataDir:    serveConfig.dataDir,
+			JWTSecret:  serveConfig.jwtSecret,
+			SiteURL:    serveConfig.siteURL,
+			PGUsername: serveConfig.pgUsername,
+			PGPassword: serveConfig.pgPassword,
+			PGDatabase: serveConfig.pgDatabase,
 		}
 
 		// Create and start server
@@ -71,6 +77,9 @@ func init() {
 	// Database configuration
 	serveCmd.Flags().StringVar(&serveConfig.dataDir, "data-dir", "./data", "Data directory for PostgreSQL")
 	serveCmd.Flags().Uint16Var(&serveConfig.pgPort, "pg-port", 5432, "PostgreSQL port")
+	serveCmd.Flags().StringVar(&serveConfig.pgUsername, "pg-username", os.Getenv("SUPALITE_PG_USERNAME"), "PostgreSQL username")
+	serveCmd.Flags().StringVar(&serveConfig.pgPassword, "pg-password", os.Getenv("SUPALITE_PG_PASSWORD"), "PostgreSQL password")
+	serveCmd.Flags().StringVar(&serveConfig.pgDatabase, "pg-database", os.Getenv("SUPALITE_PG_DATABASE"), "PostgreSQL database name")
 
 	// Auth configuration
 	serveCmd.Flags().StringVar(&serveConfig.jwtSecret, "jwt-secret", os.Getenv("SUPALITE_JWT_SECRET"), "JWT secret for signing tokens")

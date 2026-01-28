@@ -27,12 +27,15 @@ type Server struct {
 }
 
 type Config struct {
-	Host      string
-	Port      int
-	PGPort    uint16
-	DataDir   string
-	JWTSecret string
-	SiteURL   string
+	Host       string
+	Port       int
+	PGPort     uint16
+	DataDir    string
+	JWTSecret  string
+	SiteURL    string
+	PGUsername string
+	PGPassword string
+	PGDatabase string
 }
 
 func New(cfg Config) *Server {
@@ -47,11 +50,26 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// 1. Start embedded PostgreSQL
 	log.Info("starting embedded PostgreSQL...")
+
+	// Set default credentials if not provided
+	pgUsername := s.config.PGUsername
+	if pgUsername == "" {
+		pgUsername = "postgres"
+	}
+	pgPassword := s.config.PGPassword
+	if pgPassword == "" {
+		pgPassword = "postgres"
+	}
+	pgDatabase := s.config.PGDatabase
+	if pgDatabase == "" {
+		pgDatabase = "postgres"
+	}
+
 	pgCfg := pg.Config{
 		Port:     s.config.PGPort,
-		Username: "supalite",
-		Password: "supalite",
-		Database: "supalite",
+		Username: pgUsername,
+		Password: pgPassword,
+		Database: pgDatabase,
 		DataDir:  s.config.DataDir,
 		Version:  "16.9.0",
 	}
