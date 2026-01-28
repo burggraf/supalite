@@ -17,42 +17,22 @@ const (
 	LevelError
 )
 
-var (
-	globalLogger *Logger
-	once         sync.Once
-)
-
-type Logger struct {
+type logger struct {
 	mu     sync.Mutex
 	level  Level
 	writer io.Writer
 }
 
+var (
+	globalLogger *logger
+	once         sync.Once
+)
+
 func init() {
-	globalLogger = &Logger{
+	globalLogger = &logger{
 		level:  LevelInfo,
 		writer: os.Stdout,
 	}
-}
-
-func SetLevel(level Level) {
-	globalLogger.SetLevel(level)
-}
-
-func SetWriter(w io.Writer) {
-	globalLogger.SetWriter(w)
-}
-
-func (l *Logger) SetLevel(level Level) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.level = level
-}
-
-func (l *Logger) SetWriter(w io.Writer) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.writer = w
 }
 
 func Debug(msg string, args ...interface{}) {
@@ -71,13 +51,29 @@ func Error(msg string, args ...interface{}) {
 	globalLogger.log(LevelError, msg, args...)
 }
 
-func (l *Logger) log(level Level, msg string, args ...interface{}) {
+func SetLevel(level Level) {
+	globalLogger.mu.Lock()
+	defer globalLogger.mu.Unlock()
+	globalLogger.level = level
+}
+
+func SetWriter(w io.Writer) {
+	globalLogger.mu.Lock()
+	defer globalLogger.mu.Unlock()
+	globalLogger.writer = w
+}
+
+func Logger() *log.Logger {
+	return log.New(os.Stdout, "", log.LstdFlags)
+}
+
+func (l *logger) log(level Level, msg string, args ...interface{}) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
 	if level < l.level {
 		return
 	}
-
-	l.mu.Lock()
-	defer l.mu.Unlock()
 
 	prefix := ""
 	switch level {
@@ -91,14 +87,12 @@ func (l *Logger) log(level Level, msg string, args ...interface{}) {
 		prefix = "ERROR"
 	}
 
-	logMsg := fmt.Sprintf("[%s] %s", prefix, msg)
+	logMsg := "[" + prefix + "] " + msg
 	if len(args) > 0 {
-		logMsg += fmt.Sprintf(" %+v", args)
+		for _, arg := range args {
+			logMsg += " " + fmt.Sprint(arg)
+		}
 	}
-	fmt.Fprintln(l.writer, logMsg)
-}
 
-// StandardLogger returns a standard library logger for compatibility
-func StandardLogger() *log.Logger {
-	return log.New(os.Stdout, "", log.LstdFlags)
+	log.Println(logMsg)
 }
