@@ -136,8 +136,8 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}()
 
-	// 7. Wait for shutdown signal
-	return s.waitForShutdown(ctx)
+	// 7. Wait for shutdown signal (use background context to avoid timeout)
+	return s.waitForShutdown(context.Background())
 }
 
 func (s *Server) setupRoutes() {
