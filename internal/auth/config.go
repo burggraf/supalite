@@ -30,6 +30,9 @@ type Config struct {
 
 	// DBStartupDelay is the delay between connection attempts
 	DBStartupDelay time.Duration
+
+	// DataDir is the directory for storing GoTrue data
+	DataDir string
 }
 
 // DefaultConfig returns a configuration with sensible defaults

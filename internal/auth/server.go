@@ -113,6 +113,84 @@ func (s *Server) IsRunning() bool {
 	return s.running && s.ready
 }
 
+// Handler returns an HTTP handler that proxies requests to the GoTrue server
+func (s *Server) Handler() http.Handler {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.running || !s.ready {
+		return http.NotFoundHandler()
+	}
+
+	// Create a reverse proxy handler
+	targetURL := fmt.Sprintf("http://localhost:%d", s.config.Port)
+	proxy := &reverseProxy{
+		target: targetURL,
+	}
+	return proxy
+}
+
+// reverseProxy is a simple HTTP reverse proxy
+type reverseProxy struct {
+	target string
+}
+
+func (p *reverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Build the target URL
+	target := p.target + r.URL.Path
+
+	// Create the HTTP client
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		// Don't follow redirects automatically
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	// Create the proxy request
+	proxyReq, err := http.NewRequest(r.Method, target, r.Body)
+	if err != nil {
+		http.Error(w, "Failed to create proxy request", http.StatusBadGateway)
+		return
+	}
+
+	// Copy headers
+	for name, values := range r.Header {
+		for _, value := range values {
+			proxyReq.Header.Add(name, value)
+		}
+	}
+
+	// Set X-Forwarded-For header
+	if clientIP := r.Header.Get("X-Real-IP"); clientIP != "" {
+		proxyReq.Header.Set("X-Forwarded-For", clientIP)
+	} else {
+		proxyReq.Header.Set("X-Forwarded-For", r.RemoteAddr)
+	}
+
+	// Execute the request
+	resp, err := client.Do(proxyReq)
+	if err != nil {
+		http.Error(w, "Failed to proxy request", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Copy response headers
+	for name, values := range resp.Header {
+		for _, value := range values {
+			w.Header().Add(name, value)
+		}
+	}
+
+	// Write status code
+	w.WriteHeader(resp.StatusCode)
+
+	// Copy response body
+	io.Copy(w, resp.Body)
+}
+
 // buildEnv constructs the environment variables for GoTrue
 func (s *Server) buildEnv() []string {
 	var env []string
