@@ -14,6 +14,7 @@ import (
 var serveConfig struct {
 	host      string
 	port      int
+	pgPort    uint16
 	dataDir   string
 	jwtSecret string
 	siteURL   string
@@ -44,6 +45,7 @@ The server orchestrates all components and provides a unified API endpoint.`,
 		cfg := server.Config{
 			Host:      serveConfig.host,
 			Port:      serveConfig.port,
+			PGPort:    serveConfig.pgPort,
 			DataDir:   serveConfig.dataDir,
 			JWTSecret: serveConfig.jwtSecret,
 			SiteURL:   serveConfig.siteURL,
@@ -68,11 +70,9 @@ func init() {
 
 	// Database configuration
 	serveCmd.Flags().StringVar(&serveConfig.dataDir, "data-dir", "./data", "Data directory for PostgreSQL")
+	serveCmd.Flags().Uint16Var(&serveConfig.pgPort, "pg-port", 5432, "PostgreSQL port")
 
 	// Auth configuration
 	serveCmd.Flags().StringVar(&serveConfig.jwtSecret, "jwt-secret", os.Getenv("SUPALITE_JWT_SECRET"), "JWT secret for signing tokens")
 	serveCmd.Flags().StringVar(&serveConfig.siteURL, "site-url", os.Getenv("SUPALITE_SITE_URL"), "Site URL for auth callbacks")
-
-	// Environment variable bindings
-	cobra.MarkFlagRequired(serveCmd.Flags(), "port")
 }

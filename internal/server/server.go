@@ -29,6 +29,7 @@ type Server struct {
 type Config struct {
 	Host      string
 	Port      int
+	PGPort    uint16
 	DataDir   string
 	JWTSecret string
 	SiteURL   string
@@ -47,7 +48,7 @@ func (s *Server) Start(ctx context.Context) error {
 	// 1. Start embedded PostgreSQL
 	log.Info("starting embedded PostgreSQL...")
 	pgCfg := pg.Config{
-		Port:     5432,
+		Port:     s.config.PGPort,
 		Username: "supalite",
 		Password: "supalite",
 		Database: "supalite",
@@ -59,7 +60,7 @@ func (s *Server) Start(ctx context.Context) error {
 	if err := s.pgDatabase.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start PostgreSQL: %w", err)
 	}
-	log.Info("PostgreSQL started", "port", 5432)
+	log.Info("PostgreSQL started", "port", s.config.PGPort)
 
 	// 2. Initialize database schema
 	if err := s.initSchema(ctx); err != nil {
