@@ -7,12 +7,13 @@ import (
 
 // Config holds the configuration for the embedded PostgreSQL database
 type Config struct {
-	Port     uint16
-	Username string
-	Password string
-	Database string
-	DataDir  string
-	Version  string
+	Port        uint16
+	Username    string
+	Password    string
+	Database    string
+	DataDir     string
+	Version     string
+	RuntimePath string // Optional: unique runtime path to avoid conflicts
 }
 
 // DefaultConfig returns the default configuration for supalite

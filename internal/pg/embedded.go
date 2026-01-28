@@ -58,7 +58,13 @@ func (db *EmbeddedDatabase) Start(ctx context.Context) error {
 		Username(db.config.Username).
 		Password(db.config.Password).
 		Database(db.config.Database).
-		Version(embeddedpostgres.PostgresVersion(db.config.Version))
+		Version(embeddedpostgres.PostgresVersion(db.config.Version)).
+		StartTimeout(60 * time.Second)
+
+	// Set RuntimePath if provided (for test isolation)
+	if db.config.RuntimePath != "" {
+		config = config.RuntimePath(db.config.RuntimePath)
+	}
 
 	if db.config.DataDir != "" {
 		if err := os.MkdirAll(db.config.DataDir, 0755); err != nil {

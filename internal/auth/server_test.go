@@ -9,12 +9,17 @@ import (
 )
 
 func TestGoTrueServer_Start(t *testing.T) {
+	// Skip test if GoTrue is not installed
+	if _, err := findGoTrueBinary(); err != nil {
+		t.Skip("GoTrue binary not found, skipping test. Install with: go install github.com/supabase/auth/cmd/gotrue@latest")
+	}
 	// Start embedded Postgres
 	pgDB := pg.NewEmbeddedDatabase(pg.Config{
-		Port:     15434,
-		Username: "gotrue",
-		Password: "gotrue",
-		Database: "auth_test",
+		Port:        15434,
+		Username:    "gotrue",
+		Password:    "gotrue",
+		Database:    "auth_test",
+		RuntimePath: "/tmp/supalite-test-auth",
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

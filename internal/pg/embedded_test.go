@@ -10,10 +10,11 @@ import (
 
 func TestEmbeddedDatabase_Start(t *testing.T) {
 	db := NewEmbeddedDatabase(Config{
-		Port:     15432,
-		Username: "test",
-		Password: "test",
-		Database: "testdb",
+		Port:        15432,
+		Username:    "test",
+		Password:    "test",
+		Database:    "testdb",
+		RuntimePath: "/tmp/supalite-test-pg",
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

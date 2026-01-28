@@ -11,10 +11,11 @@ import (
 func TestPRESTServer_Start(t *testing.T) {
 	// Start embedded Postgres
 	pgDB := pg.NewEmbeddedDatabase(pg.Config{
-		Port:     15433,
-		Username: "test",
-		Password: "test",
-		Database: "testdb",
+		Port:        15433,
+		Username:    "test",
+		Password:    "test",
+		Database:    "testdb",
+		RuntimePath: "/tmp/supalite-test-prest",
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

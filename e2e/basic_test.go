@@ -12,11 +12,16 @@ import (
 func TestServer_Startup(t *testing.T) {
 	// Create server with test ports
 	srv := server.New(server.Config{
-		Host:      "127.0.0.1",
-		Port:      18080,
-		DataDir:   "/tmp/supalite-e2e",
-		JWTSecret: "test-secret",
-		SiteURL:   "http://localhost:18080",
+		Host:       "127.0.0.1",
+		Port:       18080,
+		PGPort:     15431, // Unique port to avoid conflicts
+		DataDir:    "/tmp/supalite-e2e",
+		JWTSecret:  "test-secret",
+		SiteURL:    "http://localhost:18080",
+		PGUsername: "postgres",
+		PGPassword: "postgres",
+		PGDatabase: "postgres",
+		RuntimePath: "/tmp/supalite-test-e2e",
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)

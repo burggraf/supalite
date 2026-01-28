@@ -27,15 +27,16 @@ type Server struct {
 }
 
 type Config struct {
-	Host       string
-	Port       int
-	PGPort     uint16
-	DataDir    string
-	JWTSecret  string
-	SiteURL    string
-	PGUsername string
-	PGPassword string
-	PGDatabase string
+	Host        string
+	Port        int
+	PGPort      uint16
+	DataDir     string
+	JWTSecret   string
+	SiteURL     string
+	PGUsername  string
+	PGPassword  string
+	PGDatabase  string
+	RuntimePath string // Optional: unique runtime path for test isolation
 }
 
 func New(cfg Config) *Server {
@@ -66,12 +67,13 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	pgCfg := pg.Config{
-		Port:     s.config.PGPort,
-		Username: pgUsername,
-		Password: pgPassword,
-		Database: pgDatabase,
-		DataDir:  s.config.DataDir,
-		Version:  "16.9.0",
+		Port:        s.config.PGPort,
+		Username:    pgUsername,
+		Password:    pgPassword,
+		Database:    pgDatabase,
+		DataDir:     s.config.DataDir,
+		Version:     "16.9.0",
+		RuntimePath: s.config.RuntimePath,
 	}
 	s.pgDatabase = pg.NewEmbeddedDatabase(pgCfg)
 
