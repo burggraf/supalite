@@ -124,12 +124,17 @@ func (db *EmbeddedDatabase) waitReady(ctx context.Context) error {
 			return nil
 		}
 
+		// Log every 5 seconds
+		if i%10 == 0 {
+			fmt.Printf("  [attempt %d/%d] connection failed: %v\n", i+1, maxRetries, err)
+		}
+
 		select {
 		case <-time.After(retryDelay):
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("context cancelled after %d attempts: %w", i, ctx.Err())
 		}
 	}
 
-	return fmt.Errorf("postgres did not become ready")
+	return fmt.Errorf("postgres did not become ready after %d attempts", maxRetries)
 }
