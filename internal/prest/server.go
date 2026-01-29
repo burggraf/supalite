@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/prest/prest/adapters/postgres"
 	"github.com/prest/prest/config"
 	"github.com/prest/prest/router"
 )
@@ -101,17 +104,71 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) configurePrest() error {
+	// Parse connection string to extract PostgreSQL connection details
+	// Format: postgres://user:pass@localhost:port/database
+	parsedURL, err := url.Parse(s.config.ConnString)
+	if err != nil {
+		return fmt.Errorf("failed to parse connection string: %w", err)
+	}
+
+	// Extract user:pass from URL
+	var pgUser, pgPass string
+	if parsedURL.User != nil {
+		pgUser = parsedURL.User.Username()
+		pgPass, _ = parsedURL.User.Password()
+	}
+
+	// Extract port from URL (default to 5432 if not specified)
+	pgPort := 5432
+	if parsedURL.Port() != "" {
+		pgPort, err = strconv.Atoi(parsedURL.Port())
+		if err != nil {
+			return fmt.Errorf("invalid port in connection string: %w", err)
+		}
+	}
+
+	// Extract database name from URL path
+	pgDatabase := "postgres"
+	if parsedURL.Path != "" && parsedURL.Path != "/" {
+		// Remove leading slash from path
+		pgDatabase = parsedURL.Path[1:]
+	}
+
+	// Extract host from URL
+	pgHost := parsedURL.Hostname()
+	if pgHost == "" {
+		pgHost = "localhost"
+	}
+
 	// Configure pREST via package config
 	config.PrestConf = &config.Prest{
-		HTTPHost:         "127.0.0.1",
-		HTTPPort:         s.config.Port,
-		PGHost:           "localhost",
-		PGPort:           5432, // Will be overridden by conn string
-		PGDatabase:       "postgres",
-		PGUser:           "postgres",
-		PGPass:           "postgres",
-		PGURL:            s.config.ConnString,
+		HTTPHost:           "127.0.0.1",
+		HTTPPort:           s.config.Port,
+		HTTPTimeout:        60, // HTTP timeout in seconds (was defaulting to 0!)
+		PGHost:             pgHost,
+		PGPort:             pgPort,
+		PGDatabase:         pgDatabase,
+		PGUser:             pgUser,
+		PGPass:             pgPass,
+		PGSSLMode:          "disable",
+		PGMaxIdleConn:      10,
+		PGMaxOpenConn:      10,
+		PGConnTimeout:      10, // Connection timeout in seconds
+		// CORS configuration to prevent AccessControl middleware panic
+		CORSAllowOrigin:    []string{"*"},
+		CORSAllowHeaders:   []string{"*"},
+		CORSAllowMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
+		CORSAllowCredentials: false,
 	}
+
+	fmt.Printf("pREST config: host=%s, port=%d, database=%s, user=%s\n",
+		pgHost, pgPort, pgDatabase, pgUser)
+
+	// Initialize the postgres adapter (required for pREST to work)
+	postgres.Load()
+
+	// Debug: Enable pREST debug logging
+	config.PrestConf.Debug = true
 
 	return nil
 }
