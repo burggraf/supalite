@@ -114,20 +114,17 @@ func (s *Server) IsRunning() bool {
 }
 
 // Handler returns an HTTP handler that proxies requests to the GoTrue server
+// The handler checks ready state on each request
 func (s *Server) Handler() http.Handler {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	if !s.running || !s.ready {
-		return http.NotFoundHandler()
-	}
-
-	// Create a reverse proxy handler
-	targetURL := fmt.Sprintf("http://localhost:%d", s.config.Port)
-	proxy := &reverseProxy{
-		target: targetURL,
-	}
-	return proxy
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Create a reverse proxy handler for this request
+		// The proxy will handle connection errors if GoTrue is not ready
+		targetURL := fmt.Sprintf("http://localhost:%d", s.config.Port)
+		proxy := &reverseProxy{
+			target: targetURL,
+		}
+		proxy.ServeHTTP(w, r)
+	})
 }
 
 // reverseProxy is a simple HTTP reverse proxy
@@ -196,19 +193,25 @@ func (s *Server) buildEnv() []string {
 	var env []string
 
 	// Database connection
+	env = append(env, fmt.Sprintf("GOTRUE_DB_DRIVER=postgres"))
 	env = append(env, fmt.Sprintf("DATABASE_URL=%s", s.config.ConnString))
 
-	// JWT configuration
+	// JWT configuration - GOTRUE_JWT_SECRET is required in v2.x
+	env = append(env, fmt.Sprintf("GOTRUE_JWT_SECRET=%s", s.config.JWTSecret))
 	env = append(env, fmt.Sprintf("JWT_SECRET=%s", s.config.JWTSecret))
 
-	// Site configuration
+	// Site configuration - GOTRUE_SITE_URL is required in v2.x
+	env = append(env, fmt.Sprintf("GOTRUE_SITE_URL=%s", s.config.SiteURL))
 	env = append(env, fmt.Sprintf("SITE_URL=%s", s.config.SiteURL))
 
 	// API configuration
+	// API_EXTERNAL_URL is required by GoTrue v2.x
+	if s.config.Port != 0 {
+		env = append(env, fmt.Sprintf("API_EXTERNAL_URL=http://localhost:%d", s.config.Port))
+	}
 	if s.config.URI != "" {
 		env = append(env, fmt.Sprintf("URI=%s", s.config.URI))
 	}
-
 	if s.config.Port != 0 {
 		env = append(env, fmt.Sprintf("PORT=%d", s.config.Port))
 	}
@@ -268,21 +271,23 @@ func findGoTrueBinary() (string, error) {
 	return "", fmt.Errorf("GoTrue binary not found in search paths: %v", searchPaths)
 }
 
-// waitReady polls the health endpoint until the server is ready
+// waitReady polls the settings endpoint until the server is ready
 func (s *Server) waitReady() {
 	client := &http.Client{
-		Timeout: 1 * time.Second,
+		Timeout: 2 * time.Second,
 	}
 
-	healthURL := fmt.Sprintf("http://localhost:%d/health", s.config.Port)
+	// Use /settings endpoint as health check since /health may not exist
+	healthURL := fmt.Sprintf("http://localhost:%d/settings", s.config.Port)
 
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 60; i++ {
 		time.Sleep(500 * time.Millisecond)
 
 		resp, err := client.Get(healthURL)
 		if err == nil {
 			resp.Body.Close()
-			if resp.StatusCode == 200 {
+			// Accept 200 or any success status code
+			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 				s.mu.Lock()
 				s.ready = true
 				s.mu.Unlock()

@@ -29,5 +29,20 @@ init:
 serve:
 	go run . serve
 
+# GoTrue version to install - matches Supabase hosted auth version
+GOTRUE_VERSION ?= v2.186.0
+
 install-gotrue:
-	go install github.com/supabase/auth/cmd/gotrue@latest
+	@echo "Installing GoTrue (auth) binary version $(GOTRUE_VERSION) from source..."
+	@if [ ! -f ./gotrue ]; then \
+		echo "Cloning supabase/auth repository at tag $(GOTRUE_VERSION)..."; \
+		git clone --depth 1 --branch $(GOTRUE_VERSION) https://github.com/supabase/auth.git /tmp/supalite-gotrue-build && \
+		cd /tmp/supalite-gotrue-build && \
+		make build && \
+		cp ./auth $$OLDPWD/gotrue && \
+		cd $$OLDPWD && \
+		rm -rf /tmp/supalite-gotrue-build && \
+		echo "GoTrue $(GOTRUE_VERSION) binary installed as ./gotrue"; \
+	else \
+		echo "GoTrue binary already exists at ./gotrue (run 'rm ./gotrue' to reinstall)"; \
+	fi

@@ -163,8 +163,31 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/rest/v1", s.handleSupabaseREST)
 	s.router.HandleFunc("/rest/v1/*", s.handleSupabaseREST)
 
-	// Proxy to GoTrue
-	s.router.Mount("/auth/v1", s.authServer.Handler())
+	// Proxy requests to GoTrue auth server
+	s.router.HandleFunc("/auth/v1/*", s.handleAuthRequest)
+}
+
+// handleAuthRequest proxies requests to the GoTrue auth server
+func (s *Server) handleAuthRequest(w http.ResponseWriter, r *http.Request) {
+	// Strip /auth/v1 prefix from the path
+	prefix := "/auth/v1"
+	originalPath := r.URL.Path
+
+	// Check if the path starts with the prefix
+	if len(originalPath) > len(prefix) && originalPath[:len(prefix)+1] == prefix+"/" {
+		// Create a modified request with the prefix stripped
+		requestPath := originalPath[len(prefix):]
+		if requestPath == "" {
+			requestPath = "/"
+		}
+
+		// Clone the request and update the path
+		r = r.Clone(r.Context())
+		r.URL.Path = requestPath
+		r.URL.RawPath = requestPath
+	}
+
+	s.authServer.Handler().ServeHTTP(w, r)
 }
 
 // handleSupabaseREST implements Supabase/PostgREST-compatible REST API
