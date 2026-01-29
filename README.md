@@ -28,11 +28,14 @@ A lightweight, single-binary backend providing Supabase-compatible functionality
 make build
 # Or: go build -o supalite .
 
-# Configure email/SMTP (optional, for user auth emails)
-./supalite config email
+# Initialize database (optional - creates config with mail capture enabled)
+./supalite init
 
 # Run the server (auto-creates database and generates API keys)
 ./supalite serve
+
+# Configure external email/SMTP (optional - mail capture works by default)
+./supalite config email
 
 # With custom port
 ./supalite serve --port 3000
@@ -127,6 +130,10 @@ If you want to initialize the database separately:
   --database mydb \
   --pg-version 16.9.0
 ```
+
+**Note:** The `init` command creates a `supalite.json` configuration file with **mail capture mode enabled by default**. This means you can immediately start developing and testing authentication flows without needing to configure SMTP. Emails sent by GoTrue will be captured to the `captured_emails` table for inspection.
+
+To configure external SMTP later, run `./supalite config email`.
 
 ## Authentication & API Keys
 
