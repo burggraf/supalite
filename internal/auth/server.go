@@ -12,7 +12,10 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
+
+	"github.com/markb/supalite/internal/log"
 )
 
 // GoTrueVersion is the version of GoTrue to download/use
@@ -89,6 +92,9 @@ func (s *Server) Start(ctx context.Context) error {
 	// Wait for the server to be ready
 	go s.waitReady()
 
+	// Monitor the subprocess and restart if it crashes
+	go s.monitorAndRestart()
+
 	return nil
 }
 
@@ -115,7 +121,24 @@ func (s *Server) Stop() error {
 func (s *Server) IsRunning() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.running && s.ready
+
+	// Check the running flag
+	if !s.running {
+		return false
+	}
+
+	// Additionally check if the process is still alive
+	if s.cmd != nil && s.cmd.Process != nil {
+		// Signal 0 checks if process exists without actually sending a signal
+		if err := s.cmd.Process.Signal(syscall.Signal(0)); err != nil {
+			// Process is dead
+			s.running = false
+			s.ready = false
+			return false
+		}
+	}
+
+	return s.ready
 }
 
 // Handler returns an HTTP handler that proxies requests to the GoTrue server
@@ -417,5 +440,37 @@ func (s *Server) monitorOutput(r io.Reader) {
 		line := scanner.Text()
 		// In a real implementation, this would go to a logger
 		fmt.Printf("[GoTrue] %s\n", line)
+	}
+}
+
+// monitorAndRestart waits for the GoTrue process to exit and restarts it
+func (s *Server) monitorAndRestart() {
+	// Wait for the command to exit
+	err := s.cmd.Wait()
+
+	s.mu.Lock()
+	s.running = false
+	s.ready = false
+	s.mu.Unlock()
+
+	// Log the exit
+	if err != nil {
+		log.Warn("GoTrue process exited unexpectedly", "error", err)
+	} else {
+		log.Info("GoTrue process exited")
+	}
+
+	// Attempt to restart after a short delay
+	time.Sleep(2 * time.Second)
+
+	log.Info("Attempting to restart GoTrue...")
+
+	// Restart by calling Start again with a new context
+	// We need to use the parent context that was passed to the original Start call
+	// Since we don't have access to it here, we'll create a new one
+	ctx := context.Background()
+	if err := s.Start(ctx); err != nil {
+		log.Error("Failed to restart GoTrue", "error", err)
+		log.Warn("Auth API will not be available until GoTrue is manually restarted")
 	}
 }
