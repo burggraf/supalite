@@ -30,6 +30,29 @@ func TestGoTrueServer_Start(t *testing.T) {
 	}
 	defer pgDB.Stop()
 
+	// Create the auth schema required by GoTrue
+	conn, err := pgDB.Connect(ctx)
+	if err != nil {
+		t.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer conn.Close(ctx)
+
+	_, err = conn.Exec(ctx, `
+		CREATE SCHEMA IF NOT EXISTS auth;
+		CREATE SCHEMA IF NOT EXISTS storage;
+		CREATE SCHEMA IF NOT EXISTS public;
+
+		-- Create postgres role that GoTrue expects
+		CREATE ROLE postgres WITH LOGIN SUPERUSER;
+		GRANT ALL PRIVILEGES ON DATABASE auth_test TO postgres;
+		GRANT ALL ON SCHEMA auth TO postgres;
+		GRANT ALL ON SCHEMA storage TO postgres;
+		GRANT ALL ON SCHEMA public TO postgres;
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create schemas and roles: %v", err)
+	}
+
 	// Create and start GoTrue server
 	authSrv := NewServer(Config{
 		ConnString:   pgDB.ConnectionString(),
