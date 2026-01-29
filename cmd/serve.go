@@ -84,6 +84,8 @@ The server orchestrates all components and provides a unified API endpoint.`,
 				URLPathsConfirmation: cfg.Email.MailerURLPathsConfirmation,
 				URLPathsRecovery:    cfg.Email.MailerURLPathsRecovery,
 				URLPathsEmailChange: cfg.Email.MailerURLPathsEmailChange,
+				CaptureMode:         cfg.Email.CaptureMode,
+				CapturePort:         cfg.Email.CapturePort,
 			}
 		}
 
@@ -200,7 +202,7 @@ func hasEmailConfig(e *config.EmailConfig) bool {
 		e.SMTPPass != "" || e.SMTPAdminEmail != "" ||
 		e.MailerURLPathsInvite != "" || e.MailerURLPathsConfirmation != "" ||
 		e.MailerURLPathsRecovery != "" || e.MailerURLPathsEmailChange != "" ||
-		e.MailerAutoconfirm
+		e.MailerAutoconfirm || e.CaptureMode
 }
 
 func init() {

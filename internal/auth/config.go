@@ -19,6 +19,10 @@ type EmailConfig struct {
 
 	// Autoconfirm skips email confirmation when true
 	Autoconfirm bool
+
+	// Capture mode configuration
+	CaptureMode bool
+	CapturePort int
 }
 
 // Config holds the configuration for the GoTrue auth server

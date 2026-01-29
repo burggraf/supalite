@@ -19,6 +19,7 @@ import (
 	"github.com/markb/supalite/internal/auth"
 	"github.com/markb/supalite/internal/keys"
 	"github.com/markb/supalite/internal/log"
+	"github.com/markb/supalite/internal/mailcapture"
 	"github.com/markb/supalite/internal/pg"
 	"github.com/markb/supalite/internal/prest"
 	"github.com/rs/cors"
@@ -29,10 +30,11 @@ type Server struct {
 	router     *chi.Mux
 	httpServer *http.Server
 
-	pgDatabase  *pg.EmbeddedDatabase
-	prestServer *prest.Server
-	authServer  *auth.Server
-	keyManager  *keys.Manager
+	pgDatabase    *pg.EmbeddedDatabase
+	prestServer   *prest.Server
+	authServer    *auth.Server
+	keyManager    *keys.Manager
+	captureServer *mailcapture.Server
 }
 
 type Config struct {
@@ -172,6 +174,27 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	log.Info("pREST started", "port", prestCfg.Port)
 
+	// 3.5. Start mail capture server if configured
+	if s.config.Email != nil && s.config.Email.CaptureMode {
+		capturePort := s.config.Email.CapturePort
+		if capturePort == 0 {
+			capturePort = 1025
+		}
+
+		log.Info("starting mail capture server...")
+		s.captureServer = mailcapture.NewServer(mailcapture.Config{
+			Port:     capturePort,
+			Host:     "localhost",
+			Database: s.pgDatabase,
+		})
+
+		if err := s.captureServer.Start(ctx); err != nil {
+			log.Warn("failed to start mail capture server", "error", err)
+		} else {
+			log.Info("mail capture server started", "port", capturePort)
+		}
+	}
+
 	// 4. Start GoTrue auth server
 	log.Info("starting GoTrue auth server...")
 	authCfg := auth.DefaultConfig()
@@ -179,7 +202,29 @@ func (s *Server) Start(ctx context.Context) error {
 	authCfg.ConnString = connString + "?search_path=auth"
 	authCfg.JWTSecret = jwtSecret // Use the JWT secret we set up for the key manager
 	authCfg.SiteURL = s.config.SiteURL
-	authCfg.Email = s.config.Email // Pass email configuration
+
+	// Handle email configuration
+	if s.config.Email != nil {
+		if s.config.Email.CaptureMode && s.captureServer != nil && s.captureServer.IsRunning() {
+			// Override SMTP settings to point to local capture server
+			log.Info("configuring GoTrue to use mail capture server")
+			authCfg.Email = &auth.EmailConfig{
+				SMTPHost:   "localhost",
+				SMTPPort:   s.captureServer.Port(),
+				SMTPUser:   "capture",
+				SMTPPass:   "capture",
+				AdminEmail: s.config.Email.AdminEmail,
+				URLPathsInvite:       s.config.Email.URLPathsInvite,
+				URLPathsConfirmation: s.config.Email.URLPathsConfirmation,
+				URLPathsRecovery:     s.config.Email.URLPathsRecovery,
+				URLPathsEmailChange:  s.config.Email.URLPathsEmailChange,
+				Autoconfirm:          s.config.Email.Autoconfirm,
+			}
+		} else {
+			authCfg.Email = s.config.Email
+		}
+	}
+
 	s.authServer = auth.NewServer(authCfg)
 	if err := s.authServer.Start(ctx); err != nil {
 		log.Warn("failed to start GoTrue", "error", err)
@@ -1677,6 +1722,10 @@ func (s *Server) waitForShutdown(ctx context.Context) error {
 
 	if s.authServer != nil {
 		_ = s.authServer.Stop()
+	}
+
+	if s.captureServer != nil {
+		_ = s.captureServer.Stop()
 	}
 
 	if s.prestServer != nil {
