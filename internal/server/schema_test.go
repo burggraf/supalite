@@ -74,19 +74,37 @@ func TestCapturedEmailsTableCreation(t *testing.T) {
 		t.Errorf("Expected 8 columns in captured_emails, got %d", columnCount)
 	}
 
-	// Verify RLS is enabled
-	var rlsEnabled bool
+	// Verify INSERT works (this would fail if RLS was enabled without policies)
+	var insertedID string
 	err = conn.QueryRow(ctx, `
-		SELECT relrowsecurity
-		FROM pg_class
-		WHERE relname = 'captured_emails'
-	`).Scan(&rlsEnabled)
+		INSERT INTO public.captured_emails (from_addr, to_addr, subject, text_body)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id
+	`, "test@example.com", "recipient@example.com", "Test Subject", "Test body").Scan(&insertedID)
 
 	if err != nil {
-		t.Fatalf("Failed to query RLS status: %v", err)
+		t.Fatalf("Failed to insert test email: %v", err)
 	}
-	if !rlsEnabled {
-		t.Error("Row Level Security should be enabled on captured_emails")
+	if insertedID == "" {
+		t.Error("Expected inserted ID to be returned")
+	}
+
+	// Verify we can read the inserted data
+	var fromAddr, subject string
+	err = conn.QueryRow(ctx, `
+		SELECT from_addr, subject
+		FROM public.captured_emails
+		WHERE id = $1
+	`, insertedID).Scan(&fromAddr, &subject)
+
+	if err != nil {
+		t.Fatalf("Failed to query inserted email: %v", err)
+	}
+	if fromAddr != "test@example.com" {
+		t.Errorf("Expected from_addr 'test@example.com', got '%s'", fromAddr)
+	}
+	if subject != "Test Subject" {
+		t.Errorf("Expected subject 'Test Subject', got '%s'", subject)
 	}
 
 	// Verify indexes exist

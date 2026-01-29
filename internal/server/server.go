@@ -1647,9 +1647,6 @@ func (s *Server) initSchema(ctx context.Context) error {
 			raw_message BYTEA
 		);
 
-		-- Enable RLS (Supabase security model)
-		ALTER TABLE public.captured_emails ENABLE ROW LEVEL SECURITY;
-
 		CREATE INDEX IF NOT EXISTS captured_emails_created_at_idx
 			ON public.captured_emails(created_at DESC);
 
