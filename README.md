@@ -15,6 +15,7 @@ A lightweight, single-binary backend providing Supabase-compatible functionality
 - **ES256 JWT Signing** - Modern asymmetric key cryptography for API tokens (default)
 - **Legacy HS256 Support** - Backward compatible with JWT_SECRET configuration
 - **JWKS Endpoint** - Public key discovery for JWT verification (`/.well-known/jwks.json`)
+- **Mail Capture Mode** - Captures authentication emails to database for local development (enabled by default)
 - **Zero Configuration** - Works out of the box with sensible defaults
 - **Fast Startup** - Sub-second startup time, suitable for serverless/edge deployments
 - **Local Development** - Perfect for local development and testing before deploying to Supabase
@@ -446,7 +447,9 @@ GoTrue handles email sending for authentication flows (email confirmation, passw
 
 #### Mail Capture Mode (Development)
 
-For local development and testing, you can capture emails to the database instead of sending them via SMTP:
+**Mail capture mode is enabled by default for all new projects.** When you run `supalite init`, a configuration file is created with mail capture enabled, allowing you to start development immediately without configuring external email services.
+
+For existing projects or to manually enable capture mode:
 
 ```bash
 ./supalite serve --capture-mode --capture-port 1025
@@ -457,6 +460,7 @@ When capture mode is enabled:
 2. GoTrue sends emails to this server instead of a real SMTP server
 3. Emails are stored in the `captured_emails` table
 4. No external email service required
+5. Query captured emails via REST API using your service_role key
 
 **Query captured emails:**
 ```bash
