@@ -9,10 +9,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 )
+
+// GoTrueVersion is the version of GoTrue to download/use
+// Should match Supabase hosted auth version for 100% compatibility
+const GoTrueVersion = "v2.186.0"
 
 // Server manages the GoTrue auth server subprocess
 type Server struct {
@@ -239,7 +244,8 @@ func (s *Server) buildEnv() []string {
 	return env
 }
 
-// findGoTrueBinary searches for the GoTrue binary in various locations
+// findGoTrueBinary searches for the GoTrue binary in various locations,
+// and downloads from GitHub releases if not found locally
 func findGoTrueBinary() (string, error) {
 	// List of locations to search
 	searchPaths := []string{
@@ -268,7 +274,63 @@ func findGoTrueBinary() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("GoTrue binary not found in search paths: %v", searchPaths)
+	// Not found locally, download from GitHub releases
+	return downloadGoTrueFromGitHub()
+}
+
+// downloadGoTrueFromGitHub downloads the GoTrue binary from GitHub releases
+func downloadGoTrueFromGitHub() (string, error) {
+	// Version to download - should match Supabase hosted auth
+	version := GoTrueVersion
+
+	// Determine the platform-specific binary name
+	// GitHub releases use: darwin-arm64, linux-amd64, etc.
+	platform := runtime.GOOS + "-" + runtime.GOARCH
+	binaryName := "gotrue-" + platform
+
+	// Cache directory for downloaded binaries
+	cacheDir := filepath.Join(os.TempDir(), "supalite-gotrue")
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create cache directory: %w", err)
+	}
+
+	extractPath := filepath.Join(cacheDir, binaryName+"-"+version)
+
+	// Check if already downloaded and valid
+	if info, err := os.Stat(extractPath); err == nil && info.Mode().Perm()&0111 != 0 {
+		return extractPath, nil
+	}
+
+	// Download URL from GitHub releases
+	// Assumes releases are structured as: gotrue-darwin-arm64, gotrue-linux-amd64, etc.
+	downloadURL := fmt.Sprintf("https://github.com/burggraf/supalite/releases/download/%s/%s", version, binaryName)
+
+	fmt.Printf("[GoTrue] Downloading from %s\n", downloadURL)
+
+	// Download the binary
+	resp, err := http.Get(downloadURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to download GoTrue: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to download GoTrue: HTTP %d", resp.StatusCode)
+	}
+
+	// Read the response body
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Write to cache
+	if err := os.WriteFile(extractPath, data, 0755); err != nil {
+		return "", fmt.Errorf("failed to write GoTrue binary: %w", err)
+	}
+
+	fmt.Printf("[GoTrue] Downloaded to %s\n", extractPath)
+	return extractPath, nil
 }
 
 // waitReady polls the settings endpoint until the server is ready

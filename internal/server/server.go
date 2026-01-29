@@ -116,7 +116,8 @@ func (s *Server) Start(ctx context.Context) error {
 	// 4. Start GoTrue auth server
 	log.Info("starting GoTrue auth server...")
 	authCfg := auth.DefaultConfig()
-	authCfg.ConnString = connString
+	// Add search_path for GoTrue to find its tables in the auth schema
+	authCfg.ConnString = connString + "?search_path=auth"
 	authCfg.JWTSecret = s.config.JWTSecret
 	authCfg.SiteURL = s.config.SiteURL
 	s.authServer = auth.NewServer(authCfg)

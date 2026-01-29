@@ -1,4 +1,4 @@
-.PHONY: build run test test-verbose clean init serve install-gotrue
+.PHONY: build run test test-verbose clean init serve install-gotrue build-gotrue-release
 
 BINARY=supalite
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -46,3 +46,35 @@ install-gotrue:
 	else \
 		echo "GoTrue binary already exists at ./gotrue (run 'rm ./gotrue' to reinstall)"; \
 	fi
+
+# Build GoTrue binaries for all platforms (for GitHub releases)
+build-gotrue-release:
+	@echo "Building GoTrue binaries for all platforms..."
+	@rm -rf /tmp/supalite-gotrue-release
+	@mkdir -p /tmp/supalite-gotrue-release
+	@echo "Cloning supabase/auth repository at tag $(GOTRUE_VERSION)..."
+	@git clone --depth 1 --branch $(GOTRUE_VERSION) https://github.com/supabase/auth.git /tmp/supalite-gotrue-release/source
+	@echo "Building for darwin-arm64 (Apple Silicon)..."
+	@cd /tmp/supalite-gotrue-release/source && \
+		GOOS=darwin GOARCH=arm64 make build && \
+		mv auth ../gotrue-darwin-arm64 && \
+		chmod +x ../gotrue-darwin-arm64
+	@echo "Building for darwin-amd64 (Intel Mac)..."
+	@cd /tmp/supalite-gotrue-release/source && \
+		GOOS=darwin GOARCH=amd64 make build && \
+		mv auth ../gotrue-darwin-amd64 && \
+		chmod +x ../gotrue-darwin-amd64
+	@echo "Building for linux-amd64..."
+	@cd /tmp/supalite-gotrue-release/source && \
+		GOOS=linux GOARCH=amd64 make build && \
+		mv auth ../gotrue-linux-amd64 && \
+		chmod +x ../gotrue-linux-amd64
+	@echo "Building for linux-arm64..."
+	@cd /tmp/supalite-gotrue-release/source && \
+		GOOS=linux GOARCH=arm64 make build && \
+		mv auth ../gotrue-linux-arm64 && \
+		chmod +x ../gotrue-linux-arm64
+	@echo "Binaries built in /tmp/supalite-gotrue-release:"
+	@ls -lh /tmp/supalite-gotrue-release/gotrue-*
+	@echo ""
+	@echo "To create a GitHub release, upload these files:"
