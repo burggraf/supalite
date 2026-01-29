@@ -28,6 +28,9 @@ A lightweight, single-binary backend providing Supabase-compatible functionality
 make build
 # Or: go build -o supalite .
 
+# Configure email/SMTP (optional, for user auth emails)
+./supalite config email
+
 # Run the server (auto-creates database and generates API keys)
 ./supalite serve
 

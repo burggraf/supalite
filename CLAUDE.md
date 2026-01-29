@@ -14,6 +14,9 @@ make build              # Build binary with version info injected
 make run                # Build and run
 make serve              # Run without building (uses go run)
 ./supalite serve        # Run built binary
+
+# Configure email/SMTP settings interactively
+./supalite config email
 ```
 
 ### Testing
