@@ -297,7 +297,39 @@ curl http://localhost:8080/health
 
 ## Configuration
 
-Configuration is available via command-line flags or environment variables.
+Supalite supports three methods for configuration, applied in the following priority order:
+
+1. **Command-line flags** (highest priority)
+2. **`supalite.json` file** (if it exists in working directory)
+3. **Environment variables** (fallback)
+4. **Default values** (lowest priority)
+
+### Configuration File
+
+Create a `supalite.json` file in your working directory (see `supalite.example.json` for a template):
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "site_url": "http://localhost:8080",
+  "data_dir": "./data",
+  "pg_port": 5432,
+  "pg_username": "postgres",
+  "pg_password": "postgres",
+  "pg_database": "postgres",
+  "email": {
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "your-email@gmail.com",
+    "smtp_pass": "your-app-password",
+    "smtp_admin_email": "admin@yourdomain.com",
+    "mailer_autoconfirm": false
+  }
+}
+```
+
+**Security Note**: `supalite.json` is listed in `.gitignore` to prevent committing secrets. Use `supalite.example.json` as a template for version control.
 
 ### Server Configuration
 
@@ -319,6 +351,69 @@ Configuration is available via command-line flags or environment variables.
 | `--pg-username` | `SUPALITE_PG_USERNAME` | `postgres` | PostgreSQL username |
 | `--pg-password` | `SUPALITE_PG_PASSWORD` | `postgres` | PostgreSQL password |
 | `--pg-database` | `SUPALITE_PG_DATABASE` | `postgres` | PostgreSQL database name |
+
+### Email Configuration
+
+GoTrue handles email sending for authentication flows (email confirmation, password reset, etc.). Email is **optional** - if not configured, users can still sign up but email confirmation will be skipped (autoconfirm mode).
+
+| Command-Line Flag | Environment Variable | Default | Description |
+|-------------------|---------------------|---------|-------------|
+| `--smtp-host` | `SUPALITE_SMTP_HOST` | (none) | SMTP server hostname |
+| `--smtp-port` | `SUPALITE_SMTP_PORT` | (none) | SMTP server port (typically 587 for TLS) |
+| `--smtp-user` | `SUPALITE_SMTP_USER` | (none) | SMTP username |
+| `--smtp-pass` | `SUPALITE_SMTP_PASS` | (none) | SMTP password |
+| `--smtp-admin-email` | `SUPALITE_SMTP_ADMIN_EMAIL` | (none) | Admin email for password resets |
+| `--mailer-autoconfirm` | `SUPALITE_MAILER_AUTOCONFIRM` | `false` | Skip email confirmation for new users |
+
+#### Email Examples
+
+**Using Gmail (requires App Password):**
+```json
+{
+  "email": {
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "your-email@gmail.com",
+    "smtp_pass": "your-16-char-app-password",
+    "smtp_admin_email": "your-email@gmail.com"
+  }
+}
+```
+
+**Using Mailgun:**
+```json
+{
+  "email": {
+    "smtp_host": "smtp.mailgun.org",
+    "smtp_port": 587,
+    "smtp_user": "postmaster@mg.yourdomain.com",
+    "smtp_pass": "your-mailgun-password",
+    "smtp_admin_email": "admin@yourdomain.com"
+  }
+}
+```
+
+**Using AWS SES:**
+```json
+{
+  "email": {
+    "smtp_host": "email-smtp.us-east-1.amazonaws.com",
+    "smtp_port": 587,
+    "smtp_user": "your-ses-smtp-username",
+    "smtp_pass": "your-ses-smtp-password",
+    "smtp_admin_email": "noreply@yourdomain.com"
+  }
+}
+```
+
+**Development (skip email confirmation):**
+```json
+{
+  "email": {
+    "mailer_autoconfirm": true
+  }
+}
+```
 
 ### Init Command Options
 
@@ -451,8 +546,9 @@ supalite/
 ├── cmd/                    # CLI commands
 │   ├── root.go            # Root command, version variables
 │   ├── init.go            # Database initialization
-│   └── serve.go           # Server orchestration
+│   └── serve.go           # Server orchestration & config loading
 ├── internal/
+│   ├── config/            # Configuration loader (file + env + flags)
 │   ├── pg/                # Embedded PostgreSQL management
 │   ├── auth/              # GoTrue auth server wrapper
 │   ├── prest/             # pREST server wrapper

@@ -1,0 +1,41 @@
+{
+  "//": "Example Supalite configuration file",
+  "//": "Copy this file to supalite.json and customize as needed",
+  "//": "Configuration loaded from: supalite.json (file) > SUPALITE_* env vars > defaults",
+
+  "host": "0.0.0.0",
+  "port": 8080,
+  "site_url": "http://localhost:8080",
+
+  "data_dir": "./data",
+  "pg_port": 5432,
+  "pg_username": "postgres",
+  "pg_password": "postgres",
+  "pg_database": "postgres",
+
+  "//": "JWT secret for legacy HS256 mode (leave empty for ES256 mode - recommended)",
+  "jwt_secret": "",
+
+  "//": "Pre-generated API keys (leave empty for auto-generation)",
+  "anon_key": "",
+  "service_role_key": "",
+
+  "email": {
+    "//": "SMTP configuration for sending auth emails (confirmations, password resets, etc.)",
+    "//": "Leave empty to skip email functionality (autoconfirm mode)",
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "your-email@gmail.com",
+    "smtp_pass": "your-app-password",
+    "smtp_admin_email": "admin@yourdomain.com",
+
+    "//": "Set to true to skip email confirmation for new users",
+    "mailer_autoconfirm": false,
+
+    "//": "URL paths for email templates (optional, defaults shown)",
+    "mailer_urlpaths_invite": "/auth/v1/verify",
+    "mailer_urlpaths_confirmation": "/auth/v1/verify",
+    "mailer_urlpaths_recovery": "/auth/v1/verify",
+    "mailer_urlpaths_email_change": "/auth/v1/verify"
+  }
+}

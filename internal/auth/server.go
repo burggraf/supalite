@@ -252,6 +252,40 @@ func (s *Server) buildEnv() []string {
 		env = append(env, fmt.Sprintf("DB_STARTUP_DELAY=%d", int(s.config.DBStartupDelay.Seconds())))
 	}
 
+	// Email configuration
+	if s.config.Email != nil {
+		if s.config.Email.SMTPHost != "" {
+			env = append(env, fmt.Sprintf("GOTRUE_SMTP_HOST=%s", s.config.Email.SMTPHost))
+		}
+		if s.config.Email.SMTPPort > 0 {
+			env = append(env, fmt.Sprintf("GOTRUE_SMTP_PORT=%d", s.config.Email.SMTPPort))
+		}
+		if s.config.Email.SMTPUser != "" {
+			env = append(env, fmt.Sprintf("GOTRUE_SMTP_USER=%s", s.config.Email.SMTPUser))
+		}
+		if s.config.Email.SMTPPass != "" {
+			env = append(env, fmt.Sprintf("GOTRUE_SMTP_PASS=%s", s.config.Email.SMTPPass))
+		}
+		if s.config.Email.AdminEmail != "" {
+			env = append(env, fmt.Sprintf("GOTRUE_SMTP_ADMIN_EMAIL=%s", s.config.Email.AdminEmail))
+		}
+		if s.config.Email.Autoconfirm {
+			env = append(env, "GOTRUE_MAILER_AUTOCONFIRM=true")
+		}
+		if s.config.Email.URLPathsInvite != "" {
+			env = append(env, fmt.Sprintf("GOTRUE_MAILER_URLPATHS_INVITE=%s", s.config.Email.URLPathsInvite))
+		}
+		if s.config.Email.URLPathsConfirmation != "" {
+			env = append(env, fmt.Sprintf("GOTRUE_MAILER_URLPATHS_CONFIRMATION=%s", s.config.Email.URLPathsConfirmation))
+		}
+		if s.config.Email.URLPathsRecovery != "" {
+			env = append(env, fmt.Sprintf("GOTRUE_MAILER_URLPATHS_RECOVERY=%s", s.config.Email.URLPathsRecovery))
+		}
+		if s.config.Email.URLPathsEmailChange != "" {
+			env = append(env, fmt.Sprintf("GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE=%s", s.config.Email.URLPathsEmailChange))
+		}
+	}
+
 	return env
 }
 

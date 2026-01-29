@@ -70,16 +70,18 @@ The main server (`internal/server/server.go`) acts as an orchestration layer tha
 ```
 cmd/
 ├── root.go          # Cobra root command, version variables (injected at build time)
-├── serve.go         # Main serve command - orchestration entry point
+├── serve.go         # Main serve command - config loading, orchestration entry point
 └── init.go          # Database initialization command
 
 internal/
+├── config/
+│   └── config.go    # Configuration loader (file + env + flags)
 ├── pg/
 │   ├── embedded.go  # Postgres lifecycle (Create, Start, Stop)
 │   └── config.go    # Postgres configuration struct
 ├── auth/
 │   ├── server.go    # GoTrue subprocess management
-│   └── config.go    # Auth configuration
+│   └── config.go    # Auth configuration (including email)
 ├── prest/
 │   ├── server.go    # pREST server configuration
 │   └── config.go    # pREST configuration
@@ -163,7 +165,41 @@ token, err := manager.VerifyToken(tokenString)
 
 ## Configuration
 
-All configuration uses Cobra flags with environment variable fallbacks:
+Supalite supports three methods for configuration, applied in the following priority order:
+
+1. **Command-line flags** (highest priority)
+2. **`supalite.json` file** (if it exists)
+3. **Environment variables** (fallback)
+4. **Default values** (lowest priority)
+
+### Configuration File
+
+Create a `supalite.json` file in the working directory (see `supalite.example.json` for a template):
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "site_url": "http://localhost:8080",
+  "data_dir": "./data",
+  "pg_port": 5432,
+  "pg_username": "postgres",
+  "pg_password": "postgres",
+  "pg_database": "postgres",
+  "email": {
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "your-email@gmail.com",
+    "smtp_pass": "your-app-password",
+    "smtp_admin_email": "admin@yourdomain.com",
+    "mailer_autoconfirm": false
+  }
+}
+```
+
+**Security Note**: `supalite.json` is listed in `.gitignore` to prevent committing secrets. Use `supalite.example.json` as a template for version control.
+
+### Server Configuration Options
 
 | Flag | Env Var | Default | Purpose |
 |------|---------|---------|---------|
@@ -173,10 +209,81 @@ All configuration uses Cobra flags with environment variable fallbacks:
 | `--jwt-secret` | `SUPALITE_JWT_SECRET` | (none) | JWT secret for legacy HS256 mode |
 | `--site-url` | `SUPALITE_SITE_URL` | `http://localhost:8080` | Auth callback URL |
 | `--pg-port` | `SUPALITE_PG_PORT` | `5432` | PostgreSQL port |
+| `--pg-username` | `SUPALITE_PG_USERNAME` | `postgres` | PostgreSQL username |
+| `--pg-password` | `SUPALITE_PG_PASSWORD` | `postgres` | PostgreSQL password |
+| `--pg-database` | `SUPALITE_PG_DATABASE` | `postgres` | PostgreSQL database name |
 | `--anon-key` | `SUPALITE_ANON_KEY` | (auto-generated) | Pre-generated anon key |
 | `--service-role-key` | `SUPALITE_SERVICE_ROLE_KEY` | (auto-generated) | Pre-generated service_role key |
 
-**JWT Mode Selection:**
+### Email Configuration
+
+GoTrue handles email sending for user authentication flows (email confirmation, password reset, etc.). Email is optional - if not configured, users can still sign up but email confirmation will be skipped (autoconfirm mode).
+
+| Flag | Env Var | Default | Purpose |
+|------|---------|---------|---------|
+| `--smtp-host` | `SUPALITE_SMTP_HOST` | (none) | SMTP server hostname |
+| `--smtp-port` | `SUPALITE_SMTP_PORT` | (none) | SMTP server port (typically 587 for TLS) |
+| `--smtp-user` | `SUPALITE_SMTP_USER` | (none) | SMTP username |
+| `--smtp-pass` | `SUPALITE_SMTP_PASS` | (none) | SMTP password |
+| `--smtp-admin-email` | `SUPALITE_SMTP_ADMIN_EMAIL` | (none) | Admin email for password resets |
+| `--mailer-autoconfirm` | `SUPALITE_MAILER_AUTOCONFIRM` | `false` | Skip email confirmation for new users |
+| `--mailer-urlpaths-invite` | `SUPALITE_MAILER_URLPATHS_INVITE` | `/auth/v1/verify` | Invite email URL path |
+| `--mailer-urlpaths-confirmation` | `SUPALITE_MAILER_URLPATHS_CONFIRMATION` | `/auth/v1/verify` | Confirmation email URL path |
+| `--mailer-urlpaths-recovery` | `SUPALITE_MAILER_URLPATHS_RECOVERY` | `/auth/v1/verify` | Recovery email URL path |
+| `--mailer-urlpaths-email-change` | `SUPALITE_MAILER_URLPATHS_EMAIL_CHANGE` | `/auth/v1/verify` | Email change URL path |
+
+### Email Examples
+
+**Using Gmail (requires App Password):**
+```json
+{
+  "email": {
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "your-email@gmail.com",
+    "smtp_pass": "your-16-char-app-password",
+    "smtp_admin_email": "your-email@gmail.com"
+  }
+}
+```
+
+**Using Mailgun:**
+```json
+{
+  "email": {
+    "smtp_host": "smtp.mailgun.org",
+    "smtp_port": 587,
+    "smtp_user": "postmaster@mg.yourdomain.com",
+    "smtp_pass": "your-mailgun-password",
+    "smtp_admin_email": "admin@yourdomain.com"
+  }
+}
+```
+
+**Using AWS SES:**
+```json
+{
+  "email": {
+    "smtp_host": "email-smtp.us-east-1.amazonaws.com",
+    "smtp_port": 587,
+    "smtp_user": "your-ses-smtp-username",
+    "smtp_pass": "your-ses-smtp-password",
+    "smtp_admin_email": "noreply@yourdomain.com"
+  }
+}
+```
+
+**Development (skip email confirmation):**
+```json
+{
+  "email": {
+    "mailer_autoconfirm": true
+  }
+}
+```
+
+### JWT Mode Selection
+
 - No `--jwt-secret` provided → ES256 mode (asymmetric, recommended)
 - `--jwt-secret` provided → HS256 mode (legacy, backward compatible)
 
@@ -210,6 +317,12 @@ Version info (`Version`, `BuildTime`, `GitCommit`) is injected via `-ldflags` at
 - **Mode switching**: Switching between ES256 and HS256 modes requires updating all client tokens (they're not interchangeable).
 
 - **Token verification**: The `VerifyToken` method exists but is not currently used by the server. GoTrue handles token verification for auth flows.
+
+- **Email configuration**: GoTrue handles all email sending internally. Supalite passes email configuration via environment variables (`GOTRUE_SMTP_*`). Email is optional - without it, GoTrue runs in autoconfirm mode where users are immediately verified.
+
+- **Config loading**: The `internal/config` package loads configuration in priority order: flags > `supalite.json` > environment variables > defaults. This allows flexible deployment scenarios (development with file, production with env vars, overrides with flags).
+
+- **Configuration security**: `supalite.json` is in `.gitignore` because it may contain sensitive credentials (SMTP passwords, API keys). Use `supalite.example.json` for documentation in version control.
 
 ## Integration with Supabase Client Libraries
 

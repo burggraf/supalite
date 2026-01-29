@@ -48,6 +48,7 @@ type Config struct {
 	RuntimePath  string // Optional: unique runtime path for test isolation
 	AnonKey      string // Optional: pre-generated anon key
 	ServiceRoleKey string // Optional: pre-generated service_role key
+	Email        *auth.EmailConfig // Optional: email configuration for GoTrue
 }
 
 func New(cfg Config) *Server {
@@ -178,6 +179,7 @@ func (s *Server) Start(ctx context.Context) error {
 	authCfg.ConnString = connString + "?search_path=auth"
 	authCfg.JWTSecret = jwtSecret // Use the JWT secret we set up for the key manager
 	authCfg.SiteURL = s.config.SiteURL
+	authCfg.Email = s.config.Email // Pass email configuration
 	s.authServer = auth.NewServer(authCfg)
 	if err := s.authServer.Start(ctx); err != nil {
 		log.Warn("failed to start GoTrue", "error", err)

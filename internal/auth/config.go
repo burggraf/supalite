@@ -2,6 +2,25 @@ package auth
 
 import "time"
 
+// EmailConfig holds email configuration for GoTrue
+type EmailConfig struct {
+	// SMTP configuration
+	SMTPHost   string
+	SMTPPort   int
+	SMTPUser   string
+	SMTPPass   string
+	AdminEmail string
+
+	// Mailer URL paths (for email templates)
+	URLPathsInvite       string
+	URLPathsConfirmation string
+	URLPathsRecovery     string
+	URLPathsEmailChange  string
+
+	// Autoconfirm skips email confirmation when true
+	Autoconfirm bool
+}
+
 // Config holds the configuration for the GoTrue auth server
 type Config struct {
 	// ConnString is the PostgreSQL connection string
@@ -33,6 +52,9 @@ type Config struct {
 
 	// DataDir is the directory for storing GoTrue data
 	DataDir string
+
+	// Email configuration for sending auth emails
+	Email *EmailConfig
 }
 
 // DefaultConfig returns a configuration with sensible defaults
