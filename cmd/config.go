@@ -22,7 +22,8 @@ var emailCmd = &cobra.Command{
 	Short: "Configure email/SMTP settings for GoTrue",
 	Long: `Interactively configure email/SMTP settings for the GoTrue auth server.
 
-This will prompt you for SMTP configuration and save it to supalite.json.`,
+This will prompt you for SMTP configuration and save it to supalite.json.
+You can also choose capture mode to store emails in the database for development.`,
 	RunE: runEmailConfig,
 }
 
@@ -37,7 +38,7 @@ func runEmailConfig(cmd *cobra.Command, args []string) error {
 	fmt.Println("Supalite Email Configuration Wizard")
 	fmt.Println("===========================================")
 	fmt.Println()
-	fmt.Println("This wizard will help you configure SMTP settings for sending emails")
+	fmt.Println("This wizard will help you configure email settings for sending emails")
 	fmt.Println("(email confirmations, password resets, etc.).")
 	fmt.Println()
 	fmt.Println("Your configuration will be saved to supalite.json")
@@ -56,13 +57,51 @@ func runEmailConfig(cmd *cobra.Command, args []string) error {
 
 	reader := bufio.NewReader(os.Stdin)
 
-	// Prompt for each field
-	cfg.Email.SMTPHost = promptString(reader, "SMTP host", cfg.Email.SMTPHost, "smtp.gmail.com")
-	cfg.Email.SMTPPort = promptInt(reader, "SMTP port", cfg.Email.SMTPPort, 587)
-	cfg.Email.SMTPUser = promptString(reader, "SMTP username", cfg.Email.SMTPUser, "")
-	cfg.Email.SMTPPass = promptString(reader, "SMTP password", cfg.Email.SMTPPass, "")
-	cfg.Email.SMTPAdminEmail = promptString(reader, "Admin email (for password resets)", cfg.Email.SMTPAdminEmail, "")
-	cfg.Email.MailerAutoconfirm = promptBool(reader, "Skip email confirmation (autoconfirm)", cfg.Email.MailerAutoconfirm, false)
+	// Step 1: Choose email mode
+	fmt.Println("\n=== Email Mode ===")
+	fmt.Println("Choose email mode:")
+	fmt.Println("  1. SMTP - Send real emails via SMTP server")
+	fmt.Println("  2. Capture - Store emails in database (for development)")
+
+	modeChoice := promptString(reader, "Enter choice", "", "1")
+	captureMode := strings.TrimSpace(modeChoice) == "2"
+
+	cfg.Email.CaptureMode = captureMode
+
+	if captureMode {
+		// Capture mode configuration
+		cfg.Email.CapturePort = promptInt(reader, "Mail capture port", cfg.Email.CapturePort, 1025)
+
+		fmt.Println()
+		fmt.Println("Capture mode enabled.")
+		fmt.Println("Emails will be stored in the database instead of being sent.")
+		fmt.Println("Query captured emails: GET /rest/v1/captured_emails")
+		fmt.Println()
+
+		// In capture mode, we don't need SMTP config
+		// Clear any existing SMTP credentials to avoid confusion
+		cfg.Email.SMTPHost = ""
+		cfg.Email.SMTPPort = 0
+		cfg.Email.SMTPUser = ""
+		cfg.Email.SMTPPass = ""
+		cfg.Email.SMTPAdminEmail = ""
+		cfg.Email.MailerAutoconfirm = false
+	} else {
+		// SMTP mode configuration
+		cfg.Email.CaptureMode = false
+		cfg.Email.CapturePort = 0
+
+		fmt.Println()
+		fmt.Println("=== SMTP Configuration ===")
+
+		// Prompt for each field
+		cfg.Email.SMTPHost = promptString(reader, "SMTP host", cfg.Email.SMTPHost, "smtp.gmail.com")
+		cfg.Email.SMTPPort = promptInt(reader, "SMTP port", cfg.Email.SMTPPort, 587)
+		cfg.Email.SMTPUser = promptString(reader, "SMTP username", cfg.Email.SMTPUser, "")
+		cfg.Email.SMTPPass = promptString(reader, "SMTP password", cfg.Email.SMTPPass, "")
+		cfg.Email.SMTPAdminEmail = promptString(reader, "Admin email (for password resets)", cfg.Email.SMTPAdminEmail, "")
+		cfg.Email.MailerAutoconfirm = promptBool(reader, "Skip email confirmation (autoconfirm)", cfg.Email.MailerAutoconfirm, false)
+	}
 
 	fmt.Println()
 
@@ -78,12 +117,21 @@ func runEmailConfig(cmd *cobra.Command, args []string) error {
 
 	// Ask for confirmation
 	fmt.Println("Configuration Summary:")
-	fmt.Printf("  SMTP Host: %s\n", cfg.Email.SMTPHost)
-	fmt.Printf("  SMTP Port: %d\n", cfg.Email.SMTPPort)
-	fmt.Printf("  SMTP User: %s\n", valueOrEmpty(cfg.Email.SMTPUser))
-	fmt.Printf("  SMTP Pass: %s\n", valueOrEmpty(maskString(cfg.Email.SMTPPass)))
-	fmt.Printf("  Admin Email: %s\n", valueOrEmpty(cfg.Email.SMTPAdminEmail))
-	fmt.Printf("  Autoconfirm: %t\n", cfg.Email.MailerAutoconfirm)
+	if cfg.Email.CaptureMode {
+		fmt.Println("  Mode: Capture (development)")
+		fmt.Printf("  Capture Port: %d\n", cfg.Email.CapturePort)
+		fmt.Println()
+		fmt.Println("  ⚠️  Emails will be stored in database, not sent!")
+		fmt.Println("  Query captured emails: GET /rest/v1/captured_emails")
+	} else {
+		fmt.Println("  Mode: SMTP (production)")
+		fmt.Printf("  SMTP Host: %s\n", cfg.Email.SMTPHost)
+		fmt.Printf("  SMTP Port: %d\n", cfg.Email.SMTPPort)
+		fmt.Printf("  SMTP User: %s\n", valueOrEmpty(cfg.Email.SMTPUser))
+		fmt.Printf("  SMTP Pass: %s\n", valueOrEmpty(maskString(cfg.Email.SMTPPass)))
+		fmt.Printf("  Admin Email: %s\n", valueOrEmpty(cfg.Email.SMTPAdminEmail))
+		fmt.Printf("  Autoconfirm: %t\n", cfg.Email.MailerAutoconfirm)
+	}
 	fmt.Println()
 
 	confirm := promptBool(reader, "Save this configuration to supalite.json?", true, true)
@@ -180,6 +228,11 @@ func promptBool(reader *bufio.Reader, label string, current, defaultVal bool) bo
 // validateEmailConfig performs sanity checks on the email configuration
 func validateEmailConfig(email *config.EmailConfig) []string {
 	var warnings []string
+
+	// In capture mode, we don't need SMTP configuration
+	if email.CaptureMode {
+		return warnings
+	}
 
 	// Check for missing required fields
 	if email.SMTPHost == "" {
