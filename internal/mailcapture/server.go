@@ -21,6 +21,9 @@ type Server struct {
 
 // NewServer creates a new mail capture server
 func NewServer(cfg Config) *Server {
+	if cfg.Database == nil {
+		panic("mailcapture: database cannot be nil")
+	}
 	if cfg.Port == 0 {
 		cfg.Port = 1025
 	}
@@ -55,7 +58,7 @@ func (s *Server) Start(ctx context.Context) error {
 	// Start listener
 	listener, err := net.Listen("tcp", s.smtpSrv.Addr)
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", s.smtpSrv.Addr, err)
+		return fmt.Errorf("failed to start mail capture server on %s: %w", s.smtpSrv.Addr, err)
 	}
 	s.listener = listener
 

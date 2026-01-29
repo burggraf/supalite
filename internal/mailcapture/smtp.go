@@ -3,6 +3,7 @@ package mailcapture
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -72,10 +73,16 @@ func (s *smtpSession) Data(r io.Reader) error {
 	textBody, htmlBody := extractBodies(msg)
 
 	// Store for each recipient
+	var failedRecipients []string
 	for _, to := range s.to {
 		if err := s.storeEmail(subject, textBody, htmlBody, to, rawMessage); err != nil {
 			log.Warn("failed to store email", "error", err, "to", to)
+			failedRecipients = append(failedRecipients, to)
 		}
+	}
+
+	if len(failedRecipients) > 0 {
+		return fmt.Errorf("failed to store email for %d recipient(s): %v", len(failedRecipients), failedRecipients)
 	}
 
 	log.Info("captured email", "from", s.from, "to", s.to, "subject", subject)

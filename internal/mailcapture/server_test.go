@@ -7,8 +7,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/markb/supalite/internal/pg"
 )
+
+// createCapturedEmailsTable creates the captured_emails table for testing
+func createCapturedEmailsTable(ctx context.Context, conn *pgx.Conn) error {
+	_, err := conn.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS public.captured_emails (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			from_addr TEXT NOT NULL,
+			to_addr TEXT NOT NULL,
+			subject TEXT,
+			text_body TEXT,
+			html_body TEXT,
+			raw_message BYTEA
+		)
+	`)
+	return err
+}
 
 func TestMailCaptureServer_CapturesEmail(t *testing.T) {
 	// Start embedded postgres
@@ -34,22 +52,11 @@ func TestMailCaptureServer_CapturesEmail(t *testing.T) {
 		t.Fatalf("Failed to connect: %v", err)
 	}
 
-	_, err = conn.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS public.captured_emails (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-			from_addr TEXT NOT NULL,
-			to_addr TEXT NOT NULL,
-			subject TEXT,
-			text_body TEXT,
-			html_body TEXT,
-			raw_message BYTEA
-		)
-	`)
-	conn.Close(ctx)
-	if err != nil {
+	if err := createCapturedEmailsTable(ctx, conn); err != nil {
+		conn.Close(ctx)
 		t.Fatalf("Failed to create table: %v", err)
 	}
+	conn.Close(ctx)
 
 	// Start mail capture server
 	srv := NewServer(Config{
@@ -142,22 +149,11 @@ func TestMailCaptureServer_CapturesMultipartEmail(t *testing.T) {
 		t.Fatalf("Failed to connect: %v", err)
 	}
 
-	_, err = conn.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS public.captured_emails (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-			from_addr TEXT NOT NULL,
-			to_addr TEXT NOT NULL,
-			subject TEXT,
-			text_body TEXT,
-			html_body TEXT,
-			raw_message BYTEA
-		)
-	`)
-	conn.Close(ctx)
-	if err != nil {
+	if err := createCapturedEmailsTable(ctx, conn); err != nil {
+		conn.Close(ctx)
 		t.Fatalf("Failed to create table: %v", err)
 	}
+	conn.Close(ctx)
 
 	// Start mail capture server
 	srv := NewServer(Config{
@@ -253,22 +249,11 @@ func TestMailCaptureServer_MultipleRecipients(t *testing.T) {
 		t.Fatalf("Failed to connect: %v", err)
 	}
 
-	_, err = conn.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS public.captured_emails (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-			from_addr TEXT NOT NULL,
-			to_addr TEXT NOT NULL,
-			subject TEXT,
-			text_body TEXT,
-			html_body TEXT,
-			raw_message BYTEA
-		)
-	`)
-	conn.Close(ctx)
-	if err != nil {
+	if err := createCapturedEmailsTable(ctx, conn); err != nil {
+		conn.Close(ctx)
 		t.Fatalf("Failed to create table: %v", err)
 	}
+	conn.Close(ctx)
 
 	// Start mail capture server
 	srv := NewServer(Config{

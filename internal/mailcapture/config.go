@@ -1,14 +1,8 @@
 package mailcapture
 
 import (
-	"github.com/jackc/pgx/v5"
 	"github.com/markb/supalite/internal/pg"
 )
-
-// Database interface for storing captured emails
-type Database interface {
-	Connect(ctx any) (*pgx.Conn, error)
-}
 
 // Config holds configuration for the mail capture server
 type Config struct {
