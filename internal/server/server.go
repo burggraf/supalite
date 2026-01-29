@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	cryptoRand "crypto/rand"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -108,24 +109,55 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// 2.5. Initialize key manager (anon/service_role keys)
 	log.Info("initializing key manager...")
-	jwtSecret := s.config.JWTSecret
-	if jwtSecret == "" {
-		// Generate a random JWT secret if not provided
-		jwtSecret = generateRandomSecret(32)
-		log.Warn("no JWT secret provided, using auto-generated secret (not recommended for production)", "secret", jwtSecret[:8]+"...")
+
+	var keyManager *keys.Manager
+	var err error
+
+	if s.config.JWTSecret == "" {
+		// ES256 mode (default): use empty string to trigger ES256 mode
+		log.Info("using ES256 mode with auto-generated keys")
+		keyManager, err = keys.NewManager(s.config.DataDir, "")
+	} else {
+		// Legacy mode: user explicitly provided JWT_SECRET
+		log.Info("using legacy mode (JWT_SECRET)")
+		keyManager, err = keys.NewManager(s.config.DataDir, s.config.JWTSecret)
 	}
 
-	keyManager, err := keys.NewManager(s.config.DataDir, jwtSecret)
 	if err != nil {
 		return fmt.Errorf("failed to initialize key manager: %w", err)
 	}
 	s.keyManager = keyManager
+
+	// Set JWT secret for GoTrue (needs it regardless of mode)
+	jwtSecret := s.config.JWTSecret
+	if jwtSecret == "" {
+		jwtSecret = generateRandomSecret(32)
+	}
 
 	if keyManager.IsLegacyMode() {
 		log.Info("keys initialized", "mode", "legacy (JWT_SECRET)")
 	} else {
 		log.Info("keys initialized", "mode", "ES256")
 	}
+
+	// Display the keys
+	log.Info("==========================================")
+	log.Info("Project API Keys")
+	log.Info("==========================================")
+	log.Info("Project URL:", s.config.SiteURL)
+	log.Info("")
+	log.Info("anon key (public):")
+	log.Info("  " + s.keyManager.GetAnonKey())
+	log.Info("")
+	log.Warn("service_role key (secret - keep hidden!):")
+	log.Warn("  " + s.keyManager.GetServiceKey())
+	log.Info("")
+	log.Info("Use these keys in your Supabase client libraries:")
+	log.Info(fmt.Sprintf("  const supabase = createClient('%s',", s.config.SiteURL))
+	log.Info(fmt.Sprintf("    '%s',  // anon key", s.keyManager.GetAnonKey()))
+	log.Info(fmt.Sprintf("    '%s'  // service_role key (use with caution!)", s.keyManager.GetServiceKey()))
+	log.Info("  )")
+	log.Info("==========================================")
 
 	connString := s.pgDatabase.ConnectionString()
 
@@ -184,6 +216,9 @@ func (s *Server) Start(ctx context.Context) error {
 func (s *Server) setupRoutes() {
 	s.router.Get("/health", s.handleHealth)
 
+	// JWKS endpoint for public key discovery (ES256 mode)
+	s.router.HandleFunc("/.well-known/jwks.json", s.handleJWKS)
+
 	// Create Supabase-compatible REST API handler
 	// Translates /rest/v1/{table} to /{database}/{schema}/{table} for pREST
 	s.router.HandleFunc("/rest/v1", s.handleSupabaseREST)
@@ -192,6 +227,25 @@ func (s *Server) setupRoutes() {
 	// Proxy requests to GoTrue auth server
 	s.router.HandleFunc("/auth/v1/*", s.handleAuthRequest)
 }
+
+// handleJWKS serves the JWKS (JSON Web Key Set) for public key discovery
+func (s *Server) handleJWKS(w http.ResponseWriter, r *http.Request) {
+	if s.keyManager == nil {
+		http.Error(w, "Key manager not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	jwks, err := s.keyManager.GetJWKS()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(jwks)
+}
+
 
 // handleAuthRequest proxies requests to the GoTrue auth server
 func (s *Server) handleAuthRequest(w http.ResponseWriter, r *http.Request) {
@@ -1600,4 +1654,22 @@ func (s *Server) waitForShutdown(ctx context.Context) error {
 
 	log.Info("Supalite stopped")
 	return nil
+}
+
+// generateRandomSecret generates a random secret string of specified length
+func generateRandomSecret(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	randomBytes := make([]byte, length)
+	if _, err := cryptoRand.Read(randomBytes); err != nil {
+		// Fallback to less secure but working method
+		for i := range b {
+			b[i] = charset[i%len(charset)]
+		}
+		return string(b)
+	}
+	for i := range b {
+		b[i] = charset[randomBytes[i]%byte(len(charset))]
+	}
+	return string(b)
 }

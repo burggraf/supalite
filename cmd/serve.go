@@ -12,15 +12,17 @@ import (
 )
 
 var serveConfig struct {
-	host       string
-	port       int
-	pgPort     uint16
-	dataDir    string
-	jwtSecret  string
-	siteURL    string
-	pgUsername string
-	pgPassword string
-	pgDatabase string
+	host           string
+	port           int
+	pgPort         uint16
+	dataDir        string
+	jwtSecret      string
+	siteURL        string
+	pgUsername     string
+	pgPassword     string
+	pgDatabase     string
+	anonKey        string
+	serviceRoleKey string
 }
 
 var serveCmd = &cobra.Command{
@@ -33,28 +35,23 @@ The server orchestrates all components and provides a unified API endpoint.`,
 		// Set log level
 		log.SetLevel(log.LevelInfo)
 
-		// Validate configuration
-		if serveConfig.jwtSecret == "" {
-			// Generate a warning but don't fail
-			log.Warn("no JWT secret provided, using default (not recommended for production)")
-			serveConfig.jwtSecret = "super-secret-jwt-token-change-in-production"
-		}
-
 		if serveConfig.siteURL == "" {
 			serveConfig.siteURL = fmt.Sprintf("http://localhost:%d", serveConfig.port)
 		}
 
 		// Create server configuration
 		cfg := server.Config{
-			Host:       serveConfig.host,
-			Port:       serveConfig.port,
-			PGPort:     serveConfig.pgPort,
-			DataDir:    serveConfig.dataDir,
-			JWTSecret:  serveConfig.jwtSecret,
-			SiteURL:    serveConfig.siteURL,
-			PGUsername: serveConfig.pgUsername,
-			PGPassword: serveConfig.pgPassword,
-			PGDatabase: serveConfig.pgDatabase,
+			Host:           serveConfig.host,
+			Port:           serveConfig.port,
+			PGPort:         serveConfig.pgPort,
+			DataDir:        serveConfig.dataDir,
+			JWTSecret:      serveConfig.jwtSecret,
+			SiteURL:        serveConfig.siteURL,
+			PGUsername:     serveConfig.pgUsername,
+			PGPassword:     serveConfig.pgPassword,
+			PGDatabase:     serveConfig.pgDatabase,
+			AnonKey:        serveConfig.anonKey,
+			ServiceRoleKey: serveConfig.serviceRoleKey,
 		}
 
 		// Create and start server
@@ -82,6 +79,8 @@ func init() {
 	serveCmd.Flags().StringVar(&serveConfig.pgDatabase, "pg-database", os.Getenv("SUPALITE_PG_DATABASE"), "PostgreSQL database name")
 
 	// Auth configuration
-	serveCmd.Flags().StringVar(&serveConfig.jwtSecret, "jwt-secret", os.Getenv("SUPALITE_JWT_SECRET"), "JWT secret for signing tokens")
+	serveCmd.Flags().StringVar(&serveConfig.jwtSecret, "jwt-secret", os.Getenv("SUPALITE_JWT_SECRET"), "JWT secret for signing tokens (legacy mode, uses ES256 if not provided)")
 	serveCmd.Flags().StringVar(&serveConfig.siteURL, "site-url", os.Getenv("SUPALITE_SITE_URL"), "Site URL for auth callbacks")
+	serveCmd.Flags().StringVar(&serveConfig.anonKey, "anon-key", os.Getenv("SUPALITE_ANON_KEY"), "Anonymous/public key (auto-generated if not provided)")
+	serveCmd.Flags().StringVar(&serveConfig.serviceRoleKey, "service-role-key", os.Getenv("SUPALITE_SERVICE_ROLE_KEY"), "Service role key (auto-generated if not provided)")
 }
