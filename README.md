@@ -92,6 +92,25 @@ make serve
 make install-gotrue
 ```
 
+### Interactive Configuration
+
+Supalite includes an interactive configuration wizard for email/SMTP settings:
+
+```bash
+./supalite config email
+```
+
+The wizard will:
+- Prompt for each SMTP field (host, port, username, password, admin email)
+- Preserve existing values from `supalite.json` when editing
+- Validate your configuration and warn about common issues:
+  - Missing required fields
+  - Unusual SMTP ports
+  - Gmail-specific requirements (App Password, full email address)
+  - Autoconfirm mode enabled
+- Show a summary before saving
+- Save all settings to `supalite.json`
+
 ### Manual Database Initialization
 
 If you want to initialize the database separately:

@@ -19,6 +19,34 @@ make serve              # Run without building (uses go run)
 ./supalite config email
 ```
 
+### Interactive Email Configuration
+
+The `supalite config email` command provides an interactive wizard for configuring SMTP settings:
+
+```bash
+./supalite config email
+```
+
+**Features:**
+- Prompts for all email configuration fields (SMTP host, port, username, password, admin email, autoconfirm)
+- Preserves existing values from `supalite.json` when reconfiguring
+- Displays current values as defaults
+- Validates configuration and warns about:
+  - Missing required fields
+  - Unusual SMTP ports (not 25, 465, or 587)
+  - Missing authentication credentials
+  - Gmail-specific requirements (App Password, full email as username)
+  - Autoconfirm mode being enabled
+- Shows configuration summary with password masking before saving
+- Writes configuration to `supalite.json`
+
+**Sanity Checks:**
+- Warns if SMTP host is set but username/password are missing
+- Warns about non-standard SMTP ports
+- Warns if using Gmail without an App Password
+- Warns if admin email is missing (password resets won't work)
+- Warns when autoconfirm is enabled (users won't receive confirmation emails)
+
 ### Testing
 ```bash
 make test               # Run all tests
