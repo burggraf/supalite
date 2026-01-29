@@ -20,9 +20,9 @@ type Server struct {
 }
 
 // NewServer creates a new mail capture server
-func NewServer(cfg Config) *Server {
+func NewServer(cfg Config) (*Server, error) {
 	if cfg.Database == nil {
-		panic("mailcapture: database cannot be nil")
+		return nil, fmt.Errorf("mailcapture: database cannot be nil")
 	}
 	if cfg.Port == 0 {
 		cfg.Port = 1025
@@ -32,7 +32,7 @@ func NewServer(cfg Config) *Server {
 	}
 	return &Server{
 		config: cfg,
-	}
+	}, nil
 }
 
 // Start begins listening for SMTP connections

@@ -3,9 +3,13 @@ module github.com/markb/supalite
 go 1.25.5
 
 require (
+	github.com/emersion/go-smtp v0.24.0
 	github.com/fergusstrange/embedded-postgres v1.33.0
+	github.com/go-chi/chi/v5 v5.2.4
 	github.com/jackc/pgx/v5 v5.8.0
+	github.com/lestrrat-go/jwx/v2 v2.1.1
 	github.com/prest/prest v1.5.5
+	github.com/rs/cors v1.11.0
 	github.com/spf13/cobra v1.10.2
 )
 
@@ -14,9 +18,7 @@ require (
 	github.com/clbanning/mxj v1.8.4 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6 // indirect
-	github.com/emersion/go-smtp v0.24.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
-	github.com/go-chi/chi/v5 v5.2.4 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
@@ -28,7 +30,6 @@ require (
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.6 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
-	github.com/lestrrat-go/jwx/v2 v2.1.1 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
@@ -36,7 +37,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rs/cors v1.11.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect

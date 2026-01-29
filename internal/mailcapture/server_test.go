@@ -59,11 +59,14 @@ func TestMailCaptureServer_CapturesEmail(t *testing.T) {
 	conn.Close(ctx)
 
 	// Start mail capture server
-	srv := NewServer(Config{
+	srv, err := NewServer(Config{
 		Port:     2525,
 		Host:     "localhost",
 		Database: db,
 	})
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
 
 	if err := srv.Start(ctx); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
@@ -156,11 +159,14 @@ func TestMailCaptureServer_CapturesMultipartEmail(t *testing.T) {
 	conn.Close(ctx)
 
 	// Start mail capture server
-	srv := NewServer(Config{
+	srv, err := NewServer(Config{
 		Port:     2526,
 		Host:     "localhost",
 		Database: db,
 	})
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
 
 	if err := srv.Start(ctx); err != nil {
 		t.Fatalf("Failed to start server: %v", err)
@@ -256,11 +262,14 @@ func TestMailCaptureServer_MultipleRecipients(t *testing.T) {
 	conn.Close(ctx)
 
 	// Start mail capture server
-	srv := NewServer(Config{
+	srv, err := NewServer(Config{
 		Port:     2527,
 		Host:     "localhost",
 		Database: db,
 	})
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
 
 	if err := srv.Start(ctx); err != nil {
 		t.Fatalf("Failed to start server: %v", err)

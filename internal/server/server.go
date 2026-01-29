@@ -182,16 +182,22 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 
 		log.Info("starting mail capture server...")
-		s.captureServer = mailcapture.NewServer(mailcapture.Config{
+		captureServer, err := mailcapture.NewServer(mailcapture.Config{
 			Port:     capturePort,
 			Host:     "localhost",
 			Database: s.pgDatabase,
 		})
-
-		if err := s.captureServer.Start(ctx); err != nil {
-			log.Warn("failed to start mail capture server", "error", err)
+		if err != nil {
+			log.Warn("failed to create mail capture server", "error", err)
+			log.Warn("mail capture mode requested but unavailable - emails will be sent to external SMTP server instead")
 		} else {
-			log.Info("mail capture server started", "port", capturePort)
+			s.captureServer = captureServer
+			if err := s.captureServer.Start(ctx); err != nil {
+				log.Warn("failed to start mail capture server", "error", err)
+				log.Warn("mail capture mode requested but unavailable - emails will be sent to external SMTP server instead")
+			} else {
+				log.Info("mail capture server started", "port", capturePort)
+			}
 		}
 	}
 
@@ -1724,6 +1730,7 @@ func (s *Server) waitForShutdown(ctx context.Context) error {
 		_ = s.authServer.Stop()
 	}
 
+	// Stop mail capture server after GoTrue (reverse of startup order)
 	if s.captureServer != nil {
 		_ = s.captureServer.Stop()
 	}
