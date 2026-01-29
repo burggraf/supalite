@@ -28,8 +28,8 @@ declare -a PLATFORMS=(
     "darwin-amd64:supalite-darwin-amd64"
     "linux-arm64:supalite-linux-arm64"
     "linux-amd64:supalite-linux-amd64"
-    # "windows-arm64:supalite-windows-arm64.exe"
-    # "windows-amd64:supalite-windows-amd64.exe"
+    "windows-arm64:supalite-windows-arm64.exe"
+    "windows-amd64:supalite-windows-amd64.exe"
 )
 
 echo "Building Supalite binaries..."
