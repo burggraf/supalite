@@ -1703,6 +1703,9 @@ func (s *Server) initSchema(ctx context.Context) error {
 
 		CREATE INDEX IF NOT EXISTS captured_emails_to_addr_idx
 			ON public.captured_emails(to_addr);
+
+		-- Enable Row Level Security (mail capture server connects as superuser, bypasses RLS)
+		ALTER TABLE public.captured_emails ENABLE ROW LEVEL SECURITY;
 	`)
 	return err
 }

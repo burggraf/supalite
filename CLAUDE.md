@@ -339,10 +339,14 @@ For development and testing, you can capture emails to the database instead of s
    ./supalite serve --capture-mode --capture-port 1025
    ```
 
-3. Query captured emails via the REST API:
+3. Query captured emails via the REST API using the service_role key:
    ```bash
-   curl http://localhost:8080/rest/v1/captured_emails?select=*&order=created_at.desc
+   curl http://localhost:8080/rest/v1/captured_emails?select=*&order=created_at.desc \
+     -H "apikey: <your-service-role-key>" \
+     -H "Authorization: Bearer <your-service-role-key>"
    ```
+
+**Security Note:** The `captured_emails` table is protected by Row Level Security (RLS). It requires the `service_role` key to read, update, or delete emails. The anon key cannot access this table. This is by design to protect PII and sensitive email content.
 
 **Captured emails table schema:**
 - `id` (UUID): Primary key
