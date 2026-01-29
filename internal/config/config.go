@@ -19,6 +19,10 @@ type EmailConfig struct {
 	MailerURLPathsConfirmation string `json:"mailer_urlpaths_confirmation,omitempty"`
 	MailerURLPathsRecovery    string `json:"mailer_urlpaths_recovery,omitempty"`
 	MailerURLPathsEmailChange string `json:"mailer_urlpaths_email_change,omitempty"`
+
+	// Capture mode configuration
+	CaptureMode bool `json:"capture_mode,omitempty"`
+	CapturePort int  `json:"capture_port,omitempty"`
 }
 
 // Config holds the complete Supalite configuration
@@ -144,6 +148,13 @@ func applyEnvFallbacks(cfg *Config) {
 	// Autoconfirm is a boolean - check for "true" string
 	if !cfg.Email.MailerAutoconfirm {
 		cfg.Email.MailerAutoconfirm = strings.ToLower(getEnv("SUPALITE_MAILER_AUTOCONFIRM", "")) == "true"
+	}
+	// Capture mode settings
+	if !cfg.Email.CaptureMode {
+		cfg.Email.CaptureMode = strings.ToLower(getEnv("SUPALITE_CAPTURE_MODE", "")) == "true"
+	}
+	if cfg.Email.CapturePort == 0 {
+		cfg.Email.CapturePort = getEnvInt("SUPALITE_CAPTURE_PORT", 0)
 	}
 }
 
