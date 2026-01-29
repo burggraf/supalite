@@ -40,6 +40,10 @@ var (
 	flagMailerUrlpathsConfirmation string
 	flagMailerUrlpathsRecovery     string
 	flagMailerUrlpathsEmailChange  string
+
+	// Email capture mode flags
+	flagCaptureMode bool
+	flagCapturePort int
 )
 
 var serveCmd = &cobra.Command{
@@ -180,6 +184,14 @@ func applyFlagOverrides(cfg *config.Config) {
 	if flagMailerUrlpathsEmailChange != "" {
 		cfg.Email.MailerURLPathsEmailChange = flagMailerUrlpathsEmailChange
 	}
+
+	// Capture mode overrides
+	if flagCaptureMode {
+		cfg.Email.CaptureMode = true
+	}
+	if flagCapturePort != 0 {
+		cfg.Email.CapturePort = flagCapturePort
+	}
 }
 
 // hasEmailConfig checks if any email configuration is set
@@ -222,4 +234,8 @@ func init() {
 	serveCmd.Flags().StringVar(&flagMailerUrlpathsConfirmation, "mailer-urlpaths-confirmation", "", "Confirmation email URL path")
 	serveCmd.Flags().StringVar(&flagMailerUrlpathsRecovery, "mailer-urlpaths-recovery", "", "Recovery email URL path")
 	serveCmd.Flags().StringVar(&flagMailerUrlpathsEmailChange, "mailer-urlpaths-email-change", "", "Email change confirmation URL path")
+
+	// Email capture mode (for development)
+	serveCmd.Flags().BoolVar(&flagCaptureMode, "capture-mode", false, "Enable email capture mode (captures emails to database instead of sending)")
+	serveCmd.Flags().IntVar(&flagCapturePort, "capture-port", 0, "Port for mail capture SMTP server (default: 1025)")
 }
