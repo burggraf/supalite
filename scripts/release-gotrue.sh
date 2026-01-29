@@ -32,7 +32,14 @@ if ! gh auth status &> /dev/null; then
 fi
 
 # Get the repository
-REPO=$(git remote get-url origin | sed 's/git@github.com:/\//' | sed 's/.git$//')
+REMOTE_URL=$(git remote get-url origin)
+# Convert git@github.com:burggraf/supalite.git to burggraf/supalite
+if [[ "$REMOTE_URL" == git@github.com:* ]]; then
+    REPO=$(echo "$REMOTE_URL" | sed 's/git@github.com://' | sed 's/.git$//')
+else
+    REPO=$(echo "$REMOTE_URL" | sed 's|https://github.com/||' | sed 's/.git$//')
+fi
+
 if [ -z "$REPO" ]; then
     REPO="burggraf/supalite"
 fi
@@ -49,26 +56,44 @@ mkdir -p "$BUILD_DIR"
 echo "Cloning supabase/auth repository at tag $VERSION..."
 git clone --depth 1 --branch "$VERSION" https://github.com/supabase/auth.git "$BUILD_DIR/source"
 
-# Platforms to build for (can add more in the future)
-# Current: macOS ARM64 (Apple Silicon)
-# Future: macOS AMD64 (Intel), Linux ARM64, Linux AMD64, Windows ARM64, Windows AMD64
-declare -A PLATFORMS
-PLATFORMS["darwin-arm64"]="gotrue-darwin-arm64"
-# PLATFORMS["darwin-amd64"]="gotrue-darwin-amd64"
-# PLATFORMS["linux-arm64"]="gotrue-linux-arm64"
-# PLATFORMS["linux-amd64"]="gotrue-linux-amd64"
-# PLATFORMS["windows-arm64"]="gotrue-windows-arm64.exe"
-# PLATFORMS["windows-amd64"]="gotrue-windows-amd64.exe"
+# Platforms to build for
+# Add more platforms by adding more build blocks below
+PLATFORMS="darwin-arm64"
 
 echo ""
 echo "Building GoTrue binaries..."
 echo ""
 
 # Build for each platform
-for PLATFORM_KEY in "${!PLATFORMS[@]}"; do
-    BINARY_NAME="${PLATFORMS[$PLATFORM_KEY]}"
-    OS="${PLATFORM_KEY%-*}"
-    ARCH="${PLATFORM_KEY#*-}"
+for PLATFORM in $PLATFORMS; do
+    OS="${PLATFORM%-*}"
+    ARCH="${PLATFORM#*-}"
+
+    # Determine binary name based on platform
+    case "$PLATFORM" in
+        darwin-arm64)
+            BINARY_NAME="gotrue-darwin-arm64"
+            ;;
+        darwin-amd64)
+            BINARY_NAME="gotrue-darwin-amd64"
+            ;;
+        linux-arm64)
+            BINARY_NAME="gotrue-linux-arm64"
+            ;;
+        linux-amd64)
+            BINARY_NAME="gotrue-linux-amd64"
+            ;;
+        windows-arm64)
+            BINARY_NAME="gotrue-windows-arm64.exe"
+            ;;
+        windows-amd64)
+            BINARY_NAME="gotrue-windows-amd64.exe"
+            ;;
+        *)
+            echo "Unknown platform: $PLATFORM"
+            exit 1
+            ;;
+    esac
 
     echo "Building for $OS-$ARCH ($BINARY_NAME)..."
 
@@ -89,7 +114,7 @@ echo "=========================================="
 echo "Build Summary"
 echo "=========================================="
 
-ls -lh "$BUILD_DIR"/gotrue-*
+ls -lh "$BUILD_DIR"/gotrue-* 2>/dev/null || echo "No binaries found"
 
 echo ""
 echo "Creating GitHub release..."
@@ -123,14 +148,16 @@ echo ""
 echo "Uploading binaries..."
 
 # Upload each binary
-for PLATFORM_KEY in "${!PLATFORMS[@]}"; do
-    BINARY_NAME="${PLATFORMS[$PLATFORM_KEY]}"
-    echo "Uploading $BINARY_NAME..."
+for BINARY_PATH in "$BUILD_DIR"/gotrue-*; do
+    if [ -f "$BINARY_PATH" ]; then
+        BINARY_NAME=$(basename "$BINARY_PATH")
+        echo "Uploading $BINARY_NAME..."
 
-    gh release upload "$VERSION" \
-        "$BUILD_DIR/$BINARY_NAME" \
-        --repo "$REPO" \
-        --clobber
+        gh release upload "$VERSION" \
+            "$BINARY_PATH" \
+            --repo "$REPO" \
+            --clobber
+    fi
 done
 
 echo ""
@@ -141,10 +168,11 @@ echo "Version: $VERSION"
 echo "Release URL: https://github.com/$REPO/releases/tag/$VERSION"
 echo ""
 echo "Binaries uploaded:"
-for PLATFORM_KEY in "${!PLATFORMS[@]}"; do
-    BINARY_NAME="${PLATFORMS[$PLATFORM_KEY]}"
-    SIZE=$(ls -lh "$BUILD_DIR/$BINARY_NAME" | awk '{print $5}')
-    echo "  - $BINARY_NAME ($SIZE)"
+for BINARY_PATH in "$BUILD_DIR"/gotrue-*; do
+    if [ -f "$BINARY_PATH" ]; then
+        SIZE=$(ls -lh "$BINARY_PATH" | awk '{print $5}')
+        echo "  - $(basename $BINARY_PATH) ($SIZE)"
+    fi
 done
 echo ""
 
