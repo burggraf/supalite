@@ -179,10 +179,21 @@ func (p *reverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	// Copy response headers
+	// Copy response headers, but skip CORS headers since the main server handles those
+	// This prevents duplicate CORS headers (e.g., "Access-Control-Allow-Origin: *, *")
+	corsHeaders := map[string]bool{
+		"Access-Control-Allow-Origin":      true,
+		"Access-Control-Allow-Methods":     true,
+		"Access-Control-Allow-Headers":     true,
+		"Access-Control-Allow-Credentials": true,
+		"Access-Control-Expose-Headers":    true,
+		"Access-Control-Max-Age":           true,
+	}
 	for name, values := range resp.Header {
-		for _, value := range values {
-			w.Header().Add(name, value)
+		if !corsHeaders[name] {
+			for _, value := range values {
+				w.Header().Add(name, value)
+			}
 		}
 	}
 

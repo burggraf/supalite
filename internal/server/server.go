@@ -21,6 +21,7 @@ import (
 	"github.com/markb/supalite/internal/log"
 	"github.com/markb/supalite/internal/pg"
 	"github.com/markb/supalite/internal/prest"
+	"github.com/rs/cors"
 )
 
 type Server struct {
@@ -192,7 +193,7 @@ func (s *Server) Start(ctx context.Context) error {
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 	s.httpServer = &http.Server{
 		Addr:         addr,
-		Handler:      s.router,
+		Handler:      s.corsHandler(),
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
@@ -226,6 +227,20 @@ func (s *Server) setupRoutes() {
 
 	// Proxy requests to GoTrue auth server
 	s.router.HandleFunc("/auth/v1/*", s.handleAuthRequest)
+}
+
+// corsHandler returns a CORS-wrapped handler for the router
+func (s *Server) corsHandler() http.Handler {
+	// Configure CORS to allow requests from browser-based Supabase clients
+	// Uses permissive settings for development (can be made configurable for production)
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"}, // Allow all origins for development
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"*"}, // Allow all headers (including Authorization, apikey, Content-Type, etc.)
+		AllowCredentials: false,         // Must be false when AllowedOrigins is "*"
+		MaxAge:           86400,         // Cache preflight response for 24 hours
+	})
+	return c.Handler(s.router)
 }
 
 // handleJWKS serves the JWKS (JSON Web Key Set) for public key discovery
