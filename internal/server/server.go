@@ -1634,6 +1634,27 @@ func (s *Server) initSchema(ctx context.Context) error {
 		CREATE SCHEMA IF NOT EXISTS auth;
 		CREATE SCHEMA IF NOT EXISTS storage;
 		CREATE SCHEMA IF NOT EXISTS public;
+
+		-- Captured emails table for development/testing
+		CREATE TABLE IF NOT EXISTS public.captured_emails (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			from_addr TEXT NOT NULL,
+			to_addr TEXT NOT NULL,
+			subject TEXT,
+			text_body TEXT,
+			html_body TEXT,
+			raw_message BYTEA
+		);
+
+		-- Enable RLS (Supabase security model)
+		ALTER TABLE public.captured_emails ENABLE ROW LEVEL SECURITY;
+
+		CREATE INDEX IF NOT EXISTS captured_emails_created_at_idx
+			ON public.captured_emails(created_at DESC);
+
+		CREATE INDEX IF NOT EXISTS captured_emails_to_addr_idx
+			ON public.captured_emails(to_addr);
 	`)
 	return err
 }
