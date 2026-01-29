@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/markb/supalite/internal/auth"
+	"github.com/markb/supalite/internal/keys"
 	"github.com/markb/supalite/internal/log"
 	"github.com/markb/supalite/internal/pg"
 	"github.com/markb/supalite/internal/prest"
@@ -29,19 +30,22 @@ type Server struct {
 	pgDatabase  *pg.EmbeddedDatabase
 	prestServer *prest.Server
 	authServer  *auth.Server
+	keyManager  *keys.Manager
 }
 
 type Config struct {
-	Host        string
-	Port        int
-	PGPort      uint16
-	DataDir     string
-	JWTSecret   string
-	SiteURL     string
-	PGUsername  string
-	PGPassword  string
-	PGDatabase  string
-	RuntimePath string // Optional: unique runtime path for test isolation
+	Host         string
+	Port         int
+	PGPort       uint16
+	DataDir      string
+	JWTSecret    string
+	SiteURL      string
+	PGUsername   string
+	PGPassword   string
+	PGDatabase   string
+	RuntimePath  string // Optional: unique runtime path for test isolation
+	AnonKey      string // Optional: pre-generated anon key
+	ServiceRoleKey string // Optional: pre-generated service_role key
 }
 
 func New(cfg Config) *Server {
@@ -102,6 +106,27 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
+	// 2.5. Initialize key manager (anon/service_role keys)
+	log.Info("initializing key manager...")
+	jwtSecret := s.config.JWTSecret
+	if jwtSecret == "" {
+		// Generate a random JWT secret if not provided
+		jwtSecret = generateRandomSecret(32)
+		log.Warn("no JWT secret provided, using auto-generated secret (not recommended for production)", "secret", jwtSecret[:8]+"...")
+	}
+
+	keyManager, err := keys.NewManager(s.config.DataDir, jwtSecret)
+	if err != nil {
+		return fmt.Errorf("failed to initialize key manager: %w", err)
+	}
+	s.keyManager = keyManager
+
+	if keyManager.IsLegacyMode() {
+		log.Info("keys initialized", "mode", "legacy (JWT_SECRET)")
+	} else {
+		log.Info("keys initialized", "mode", "ES256")
+	}
+
 	connString := s.pgDatabase.ConnectionString()
 
 	// 3. Start pREST server
@@ -118,7 +143,7 @@ func (s *Server) Start(ctx context.Context) error {
 	authCfg := auth.DefaultConfig()
 	// Add search_path for GoTrue to find its tables in the auth schema
 	authCfg.ConnString = connString + "?search_path=auth"
-	authCfg.JWTSecret = s.config.JWTSecret
+	authCfg.JWTSecret = jwtSecret // Use the JWT secret we set up for the key manager
 	authCfg.SiteURL = s.config.SiteURL
 	s.authServer = auth.NewServer(authCfg)
 	if err := s.authServer.Start(ctx); err != nil {
