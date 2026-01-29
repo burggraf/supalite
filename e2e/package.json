@@ -1,0 +1,24 @@
+{
+  "name": "supalite-e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for supalite - Supabase PostgREST compatibility testing",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --no-file-parallelism --max-workers=1",
+    "test:watch": "vitest",
+    "test:rest": "vitest run --testPathPattern=rest/",
+    "setup": "tsx scripts/setup-test-db.ts",
+    "server:start": "cd .. && ./supalite serve &",
+    "server:stop": "pkill -f 'supalite serve' || true"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "@types/node": "^20.10.0",
+    "jsonwebtoken": "^9.0.0",
+    "@types/jsonwebtoken": "^9.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0",
+    "pg": "^8.11.0"
+  }
+}
