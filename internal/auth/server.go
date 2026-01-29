@@ -138,8 +138,11 @@ type reverseProxy struct {
 }
 
 func (p *reverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Build the target URL
+	// Build the target URL (including query parameters)
 	target := p.target + r.URL.Path
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
 
 	// Create the HTTP client
 	client := &http.Client{
@@ -222,8 +225,8 @@ func (s *Server) buildEnv() []string {
 
 	// API configuration
 	// API_EXTERNAL_URL is required by GoTrue v2.x
-	if s.config.Port != 0 {
-		env = append(env, fmt.Sprintf("API_EXTERNAL_URL=http://localhost:%d", s.config.Port))
+	if s.config.SiteURL != "" {
+		env = append(env, fmt.Sprintf("API_EXTERNAL_URL=%s", s.config.SiteURL))
 	}
 	if s.config.URI != "" {
 		env = append(env, fmt.Sprintf("URI=%s", s.config.URI))
