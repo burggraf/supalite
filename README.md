@@ -437,6 +437,54 @@ GoTrue handles email sending for authentication flows (email confirmation, passw
 }
 ```
 
+#### Mail Capture Mode (Development)
+
+For local development and testing, you can capture emails to the database instead of sending them via SMTP:
+
+```bash
+./supalite serve --capture-mode --capture-port 1025
+```
+
+When capture mode is enabled:
+1. A local SMTP server starts on the specified port (default: 1025)
+2. GoTrue sends emails to this server instead of a real SMTP server
+3. Emails are stored in the `captured_emails` table
+4. No external email service required
+
+**Query captured emails:**
+```bash
+curl http://localhost:8080/rest/v1/captured_emails?select=*&order=created_at.desc \
+  -H "apikey: <your-service-role-key>" \
+  -H "Authorization: Bearer <your-service-role-key>"
+```
+
+**Configuration file:**
+```json
+{
+  "email": {
+    "capture_mode": true,
+    "capture_port": 1025
+  }
+}
+```
+
+| Command-Line Flag | Environment Variable | Default | Description |
+|-------------------|---------------------|---------|-------------|
+| `--capture-mode` | `SUPALITE_CAPTURE_MODE` | `false` | Enable mail capture mode |
+| `--capture-port` | `SUPALITE_CAPTURE_PORT` | `1025` | Port for SMTP server |
+
+**Captured emails table schema:**
+- `id` (UUID): Primary key
+- `created_at` (timestamp): When the email was captured
+- `from_addr` (text): Sender email address
+- `to_addr` (text): Recipient email address
+- `subject` (text): Email subject
+- `text_body` (text): Plain text body
+- `html_body` (text): HTML body
+- `raw_message` (bytea): Raw email message
+
+**Security Note:** The `captured_emails` table is protected by Row Level Security (RLS). It requires the `service_role` key to read, update, or delete emails. The anon key cannot access this table by design to protect PII and sensitive email content.
+
 ### Init Command Options
 
 | Command-Line Flag | Default | Description |
