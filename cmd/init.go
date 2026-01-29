@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
+	"github.com/markb/supalite/internal/config"
 	"github.com/markb/supalite/internal/pg"
 	"github.com/spf13/cobra"
 )
@@ -47,10 +50,17 @@ var initCmd = &cobra.Command{
 			return fmt.Errorf("failed to initialize schema: %w", err)
 		}
 
+		// Create supalite.json with capture mode enabled by default
+		if err := createDefaultConfig(initConfig.dbPath, initConfig.port, initConfig.username, initConfig.password, initConfig.database); err != nil {
+			return fmt.Errorf("failed to create config file: %w", err)
+		}
+
 		fmt.Printf("Database initialized successfully!\n")
 		fmt.Printf("Data directory: %s\n", initConfig.dbPath)
 		fmt.Printf("Connection: postgres://%s:****@localhost:%d/%s\n",
 			initConfig.username, initConfig.port, initConfig.database)
+		fmt.Printf("\nMail capture mode enabled by default for development.\n")
+		fmt.Printf("Configuration written to: %s\n", getConfigPath(initConfig.dbPath))
 
 		return nil
 	},
@@ -69,6 +79,53 @@ func initSchema(ctx context.Context, db *pg.EmbeddedDatabase) error {
 		CREATE SCHEMA IF NOT EXISTS public;
 	`)
 	return err
+}
+
+// createDefaultConfig creates a supalite.json file with capture mode enabled by default
+func createDefaultConfig(dataDir string, pgPort uint16, username, password, database string) error {
+	configPath := getConfigPath(dataDir)
+
+	// Check if config already exists
+	if _, err := os.Stat(configPath); err == nil {
+		// Config already exists, don't overwrite
+		return nil
+	}
+
+	// Create default config with capture mode enabled
+	cfg := &config.Config{
+		DataDir:  dataDir,
+		PGPort:   pgPort,
+		PGUsername: username,
+		PGPassword: password,
+		PGDatabase: database,
+		Email: &config.EmailConfig{
+			CaptureMode: true,
+			CapturePort: 1025,
+		},
+	}
+
+	// Marshal to JSON with indentation
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
+// getConfigPath returns the path to supalite.json
+func getConfigPath(dataDir string) string {
+	// If dataDir is a relative path, use current directory
+	if dataDir == "./data" || dataDir == "data" {
+		return "supalite.json"
+	}
+	// Otherwise, place it in the data directory
+	return dataDir + "/supalite.json"
 }
 
 func init() {
