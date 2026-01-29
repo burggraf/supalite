@@ -21,8 +21,13 @@
   "service_role_key": "",
 
   "email": {
+    "//": "Enable capture mode for development - emails are stored in database instead of sent",
+    "capture_mode": false,
+    "capture_port": 1025,
+
     "//": "SMTP configuration for sending auth emails (confirmations, password resets, etc.)",
     "//": "Leave empty to skip email functionality (autoconfirm mode)",
+    "//": "SMTP configuration is ignored when capture_mode is true",
     "smtp_host": "smtp.gmail.com",
     "smtp_port": 587,
     "smtp_user": "your-email@gmail.com",

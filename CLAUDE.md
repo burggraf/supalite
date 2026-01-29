@@ -313,6 +313,47 @@ GoTrue handles email sending for user authentication flows (email confirmation, 
 }
 ```
 
+### Email Capture Mode (Development)
+
+For development and testing, you can capture emails to the database instead of sending them:
+
+| Flag | Env Var | Default | Purpose |
+|------|---------|---------|---------|
+| `--capture-mode` | `SUPALITE_CAPTURE_MODE` | `false` | Enable email capture mode |
+| `--capture-port` | `SUPALITE_CAPTURE_PORT` | `1025` | Port for local SMTP server |
+
+**Usage:**
+
+1. Enable capture mode in `supalite.json`:
+   ```json
+   {
+     "email": {
+       "capture_mode": true,
+       "capture_port": 1025
+     }
+   }
+   ```
+
+2. Or via command line:
+   ```bash
+   ./supalite serve --capture-mode --capture-port 1025
+   ```
+
+3. Query captured emails via the REST API:
+   ```bash
+   curl http://localhost:8080/rest/v1/captured_emails?select=*&order=created_at.desc
+   ```
+
+**Captured emails table schema:**
+- `id` (UUID): Primary key
+- `created_at` (timestamp): When the email was captured
+- `from_addr` (text): Sender email address
+- `to_addr` (text): Recipient email address
+- `subject` (text): Email subject
+- `text_body` (text): Plain text body
+- `html_body` (text): HTML body
+- `raw_message` (bytea): Raw SMTP message
+
 ### JWT Mode Selection
 
 - No `--jwt-secret` provided → ES256 mode (asymmetric, recommended)
