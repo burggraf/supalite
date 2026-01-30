@@ -11,7 +11,7 @@ import (
 	"github.com/markb/supalite/internal/log"
 )
 
-//go:embed all:../../dashboard/dist
+//go:embed dist
 var dashboardFS embed.FS
 
 // Server represents the dashboard HTTP server.
@@ -57,11 +57,12 @@ type Config struct {
 func NewServer(cfg Config) *Server {
 	jwtManager := NewJWTManager([]byte(cfg.JWTSecret))
 
-	// Create sub FS that removes the dashboard/dist prefix for serving
-	distFS, err := fs.Sub(dashboardFS, "dashboard/dist")
+	// Create sub FS that removes the dist prefix for serving
+	distFS, err := fs.Sub(dashboardFS, "dist")
 	if err != nil {
-		// Fallback to empty FS if embed fails (development mode)
-		distFS = http.Dir("")
+		log.Warn("failed to create embedded filesystem for dashboard", "error", err)
+		// This should not happen in production builds
+		distFS = dashboardFS
 	}
 
 	return &Server{

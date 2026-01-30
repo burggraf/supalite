@@ -10,6 +10,9 @@ LDFLAGS=-ldflags "-X github.com/markb/supalite/cmd.Version=$(VERSION) -X github.
 build-dashboard:
 	@echo "Building dashboard frontend..."
 	cd dashboard && npm run build
+	@echo "Copying dashboard dist to internal/dashboard for embedding..."
+	rm -rf internal/dashboard/dist
+	cp -r dashboard/dist internal/dashboard/dist
 
 build-go:
 	go build $(LDFLAGS) -o $(BINARY) .

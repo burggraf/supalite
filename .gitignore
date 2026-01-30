@@ -4,3 +4,4 @@ data/
 gotrue
 node_modules
 release/
+internal/dashboard/dist/
