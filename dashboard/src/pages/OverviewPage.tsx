@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import Header from '../components/Header'
 import StatusCard from '../components/StatusCard'
@@ -120,7 +121,15 @@ function OverviewPage() {
 
       {/* Tables Preview */}
       <div className="mt-8">
-        <h3 className="text-lg leading-6 font-medium text-gray-900">Database Tables</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg leading-6 font-medium text-gray-900">Database Tables</h3>
+          <Link
+            to="/tables"
+            className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+          >
+            View all
+          </Link>
+        </div>
         <div className="mt-4 bg-white shadow overflow-hidden rounded-md">
           <ul className="divide-y divide-gray-200">
             {tables?.tables.slice(0, 5).map((table) => (

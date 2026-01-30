@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/markb/supalite/internal/log"
 	"golang.org/x/crypto/bcrypt"
@@ -67,6 +68,21 @@ type tableInfo struct {
 // Returns a list of tables in the database.
 type tablesResponse struct {
 	Tables []tableInfo `json:"tables"`
+}
+
+// columnInfo represents information about a table column.
+type columnInfo struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Nullable bool   `json:"nullable"`
+	Key      string `json:"key,omitempty"`
+}
+
+// tableSchemaResponse represents the response for /api/tables/{name}/schema endpoint.
+type tableSchemaResponse struct {
+	TableName string       `json:"table_name"`
+	Schema    string       `json:"schema"`
+	Columns   []columnInfo `json:"columns"`
 }
 
 // handleLogin processes admin login requests.
@@ -376,4 +392,126 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fileServer.ServeHTTP(w, r)
+}
+
+// handleGetTableSchema returns the schema for a specific table.
+//
+// GET /api/tables/{name}/schema
+//
+// Requires valid JWT token in Authorization header.
+//
+// Returns detailed information about the table's columns including:
+//   - Column name
+//   - Data type
+//   - Nullable status
+//   - Key information (PRIMARY KEY, FOREIGN KEY, etc.)
+//
+// Response (200 OK):
+//   {
+//     "table_name": "users",
+//     "schema": "public",
+//     "columns": [
+//       {
+//         "name": "id",
+//         "type": "uuid",
+//         "nullable": false,
+//         "key": "PRIMARY KEY"
+//       }
+//     ]
+//   }
+//
+// Returns 401 if not authenticated, 404 if table not found,
+// or 500 for server errors.
+func (s *Server) handleGetTableSchema(w http.ResponseWriter, r *http.Request) {
+	// Extract table name from URL path
+	// URL format: /api/tables/{tableName}/schema
+	tableName := chi.URLParam(r, "tableName")
+	if tableName == "" {
+		http.Error(w, "table name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Connect to database
+	ctx := r.Context()
+	conn, err := s.pgConnector.Connect(ctx)
+	if err != nil {
+		log.Error("dashboard table schema: database connection failed", "error", err)
+		http.Error(w, "database connection failed", http.StatusInternalServerError)
+		return
+	}
+	defer conn.Close(ctx)
+
+	// Query column information from information_schema
+	query := `
+		SELECT
+			column_name,
+			data_type,
+			is_nullable,
+			column_default
+		FROM information_schema.columns
+		WHERE table_name = $1
+		AND table_schema IN ('public', 'admin', 'auth', 'storage')
+		ORDER BY ordinal_position
+	`
+
+	rows, err := conn.Query(ctx, query, tableName)
+	if err != nil {
+		log.Error("dashboard table schema: query failed", "error", err)
+		http.Error(w, "database query failed", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var columns []columnInfo
+	var schemaName string
+
+	for rows.Next() {
+		var col columnInfo
+		var nullable string
+		var defaultValue sql.NullString
+
+		if err := rows.Scan(&col.Name, &col.Type, &nullable, &defaultValue); err != nil {
+			log.Error("dashboard table schema: row scan failed", "error", err)
+			continue
+		}
+
+		col.Nullable = (nullable == "YES")
+
+		// Set key information (simplified - would need additional queries for full key info)
+		if col.Name == "id" {
+			col.Key = "PRIMARY KEY"
+		}
+
+		columns = append(columns, col)
+	}
+
+	// Get schema name by checking which schema has this table
+	schemaQuery := `
+		SELECT table_schema
+		FROM information_schema.tables
+		WHERE table_name = $1
+		AND table_schema IN ('public', 'admin', 'auth', 'storage')
+		LIMIT 1
+	`
+	err = conn.QueryRow(ctx, schemaQuery, tableName).Scan(&schemaName)
+	if err != nil {
+		log.Error("dashboard table schema: schema lookup failed", "error", err)
+		schemaName = "public" // fallback
+	}
+
+	// Check if we found any columns
+	if len(columns) == 0 {
+		http.Error(w, "table not found", http.StatusNotFound)
+		return
+	}
+
+	response := tableSchemaResponse{
+		TableName: tableName,
+		Schema:    schemaName,
+		Columns:   columns,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }

@@ -79,7 +79,8 @@ func NewServer(cfg Config) *Server {
 //   - GET  /api/me - Protected: returns current user info
 //   - GET  /api/status - Protected: returns server status
 //   - GET  /api/tables - Protected: lists database tables
-//   - /* - Static file serving (placeholder)
+//   - GET  /api/tables/{name}/schema - Protected: returns table schema
+//   - /* - Static file serving
 func (s *Server) setupRoutes() {
 	// Public routes
 	s.router.Post("/api/login", s.handleLogin)
@@ -90,9 +91,10 @@ func (s *Server) setupRoutes() {
 		r.Get("/api/me", s.handleMe)
 		r.Get("/api/status", s.handleStatus)
 		r.Get("/api/tables", s.handleListTables)
+		r.Get("/api/tables/{tableName}/schema", s.handleGetTableSchema)
 	})
 
-	// Static file serving (placeholder for now)
+	// Static file serving
 	s.router.Get("/*", s.handleStatic)
 }
 
