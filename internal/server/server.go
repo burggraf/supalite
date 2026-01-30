@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/markb/supalite/internal/auth"
+	"github.com/markb/supalite/internal/dashboard"
 	"github.com/markb/supalite/internal/keys"
 	"github.com/markb/supalite/internal/log"
 	"github.com/markb/supalite/internal/mailcapture"
@@ -35,6 +36,7 @@ type Server struct {
 	authServer    *auth.Server
 	keyManager    *keys.Manager
 	captureServer *mailcapture.Server
+	dashboardServer *dashboard.Server
 }
 
 type Config struct {
@@ -138,6 +140,9 @@ func (s *Server) Start(ctx context.Context) error {
 		jwtSecret = generateRandomSecret(32)
 	}
 
+	// Generate separate JWT secret for dashboard authentication
+	dashboardSecret := generateRandomSecret(32)
+
 	if keyManager.IsLegacyMode() {
 		log.Info("keys initialized", "mode", "legacy (JWT_SECRET)")
 	} else {
@@ -239,6 +244,14 @@ func (s *Server) Start(ctx context.Context) error {
 		log.Info("GoTrue started", "port", authCfg.Port)
 	}
 
+	// 4.5. Initialize dashboard server
+	log.Info("initializing dashboard server...")
+	s.dashboardServer = dashboard.NewServer(dashboard.Config{
+		JWTSecret:  dashboardSecret,
+		PGDatabase: s.pgDatabase,
+	})
+	log.Info("dashboard initialized")
+
 	// 5. Setup orchestration routes
 	s.setupRoutes()
 
@@ -258,6 +271,7 @@ func (s *Server) Start(ctx context.Context) error {
 		log.Info("  Auth:    http://localhost:8080/auth/v1/*")
 		log.Info("  REST:    http://localhost:8080/rest/v1/*")
 		log.Info("  Health:  http://localhost:8080/health")
+		log.Info("  Dashboard: http://localhost:8080/_/")
 		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errCh <- err
 		}
@@ -280,6 +294,9 @@ func (s *Server) setupRoutes() {
 
 	// Proxy requests to GoTrue auth server
 	s.router.HandleFunc("/auth/v1/*", s.handleAuthRequest)
+
+	// Mount dashboard server at /_
+	s.router.Mount("/_", s.dashboardServer.Handler())
 }
 
 // corsHandler returns a CORS-wrapped handler for the router
