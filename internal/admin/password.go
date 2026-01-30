@@ -7,8 +7,8 @@
 //
 // # Security
 //
-// Passwords are hashed using bcrypt with a cost factor of 12, which provides
-// a good balance between security and performance. The bcrypt algorithm is
+// Passwords are hashed using bcrypt with a cost factor of 10 (bcrypt.DefaultCost),
+// which provides a good balance between security and performance. The bcrypt algorithm is
 // resistant to brute force attacks and includes its own salt.
 //
 // # Database Schema
@@ -31,7 +31,7 @@ import (
 
 const (
 	// BcryptCost is the cost factor for bcrypt hashing.
-	// A cost of 12 provides a good balance between security and performance.
+	// A cost of 10 provides a good balance between security and performance.
 	// Each increment doubles the time required to hash a password.
 	BcryptCost = bcrypt.DefaultCost
 )

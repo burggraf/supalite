@@ -50,6 +50,10 @@ func Create(ctx context.Context, conn *pgx.Conn, email, password string) (*User,
 
 // FindByEmail looks up a user by email address
 func FindByEmail(ctx context.Context, conn *pgx.Conn, email string) (*User, error) {
+	if email == "" {
+		return nil, fmt.Errorf("email cannot be empty")
+	}
+
 	query := `
 		SELECT id, email, password_hash, created_at, updated_at
 		FROM admin.users
@@ -66,7 +70,7 @@ func FindByEmail(ctx context.Context, conn *pgx.Conn, email string) (*User, erro
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find user by email: %w", err)
 	}
 
 	return &user, nil
@@ -80,34 +84,55 @@ func List(ctx context.Context, conn *pgx.Conn) ([]User, error) {
 		ORDER BY created_at DESC
 	`
 
-	rows, _ := conn.Query(ctx, query)
+	rows, err := conn.Query(ctx, query)
+	if err != nil {
+		return []User{}, fmt.Errorf("failed to list users: %w", err)
+	}
 	defer rows.Close()
 
-	var users []User
+	users := make([]User, 0)
 	for rows.Next() {
 		var user User
 		err := rows.Scan(&user.ID, &user.Email, &user.CreatedAt, &user.UpdatedAt)
 		if err != nil {
-			return nil, err
+			return []User{}, fmt.Errorf("failed to scan user: %w", err)
 		}
 		users = append(users, user)
 	}
 
-	return users, rows.Err()
+	if err := rows.Err(); err != nil {
+		return []User{}, fmt.Errorf("error iterating users: %w", err)
+	}
+
+	return users, nil
 }
 
 // Delete removes a user by email
 func Delete(ctx context.Context, conn *pgx.Conn, email string) error {
+	if email == "" {
+		return fmt.Errorf("email cannot be empty")
+	}
+
 	query := `DELETE FROM admin.users WHERE email = $1`
 	_, err := conn.Exec(ctx, query, email)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+	return nil
 }
 
 // UpdatePassword changes a user's password
 func UpdatePassword(ctx context.Context, conn *pgx.Conn, email, newPassword string) error {
+	if email == "" {
+		return fmt.Errorf("email cannot be empty")
+	}
+	if newPassword == "" {
+		return fmt.Errorf("new password cannot be empty")
+	}
+
 	hash, err := HashPassword(newPassword)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
 	query := `
@@ -116,12 +141,18 @@ func UpdatePassword(ctx context.Context, conn *pgx.Conn, email, newPassword stri
 		WHERE email = $3
 	`
 	_, err = conn.Exec(ctx, query, hash, time.Now(), email)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+	return nil
 }
 
 // Count returns the total number of admin users
 func Count(ctx context.Context, conn *pgx.Conn) (int, error) {
 	var count int
 	err := conn.QueryRow(ctx, "SELECT COUNT(*) FROM admin.users").Scan(&count)
-	return count, err
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users: %w", err)
+	}
+	return count, nil
 }

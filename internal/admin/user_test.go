@@ -9,6 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const testTimeout = 5 * time.Second
+
 // getTestConnection creates a test database connection
 func getTestConnection(t *testing.T) *pgx.Conn {
 	// Try to connect to the test database
@@ -17,7 +19,7 @@ func getTestConnection(t *testing.T) *pgx.Conn {
 		connStr = "postgres://postgres:postgres@localhost:5432/postgres"
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 
 	conn, err := pgx.Connect(ctx, connStr)
