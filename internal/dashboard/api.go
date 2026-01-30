@@ -360,49 +360,20 @@ func (s *Server) handleListTables(w http.ResponseWriter, r *http.Request) {
 //
 // GET /*
 //
-// This is a placeholder handler that returns a simple HTML page
-// indicating the dashboard is under construction. In a full implementation,
-// this would serve the built React/Vue/other frontend files.
+// Serves the embedded React dashboard files using http.FileServer.
+// For requests to the root path, serves index.html to support client-side routing.
 //
-// Currently returns:
-//   - 200 OK with HTML placeholder for root path
-//   - 404 for all other paths
-//
-// Future implementation would use an embedded filesystem (via embed.FS)
-// to serve production-built frontend assets.
+// The dashboard is embedded in the binary using Go's embed.FS directive,
+// which packages the entire dashboard/dist directory at compile time.
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
-	// For now, return a simple placeholder
+	// Serve static files using the embedded filesystem
+	fileServer := http.FileServer(s.staticFS)
+
+	// If the path is root or a directory, serve index.html
+	// This supports client-side routing in React
 	if r.URL.Path == "/" || r.URL.Path == "" {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `<!DOCTYPE html>
-<html>
-<head>
-	<title>Supalite Dashboard</title>
-	<style>
-		body { font-family: system-ui, sans-serif; max-width: 800px; margin: 100px auto; padding: 20px; }
-		h1 { color: #333; }
-		p { color: #666; }
-		.info { background: #f0f0f0; padding: 20px; border-radius: 8px; margin: 20px 0; }
-	</style>
-</head>
-<body>
-	<h1>Supalite Dashboard</h1>
-	<p>The dashboard is under construction. Check back soon!</p>
-	<div class="info">
-		<h3>Available API Endpoints:</h3>
-		<ul>
-			<li><code>POST /api/login</code> - Admin login</li>
-			<li><code>GET /api/me</code> - Current user info</li>
-			<li><code>GET /api/status</code> - Server status</li>
-			<li><code>GET /api/tables</code> - List database tables</li>
-		</ul>
-	</div>
-</body>
-</html>`)
-		return
+		r.URL.Path = "/index.html"
 	}
 
-	// Return 404 for all other static paths
-	http.NotFound(w, r)
+	fileServer.ServeHTTP(w, r)
 }

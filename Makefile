@@ -1,4 +1,4 @@
-.PHONY: build run test test-verbose clean init serve install-gotrue build-gotrue-release
+.PHONY: build run test test-verbose clean init serve install-gotrue build-gotrue-release build-dashboard build-go
 
 BINARY=supalite
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -7,8 +7,14 @@ GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 LDFLAGS=-ldflags "-X github.com/markb/supalite/cmd.Version=$(VERSION) -X github.com/markb/supalite/cmd.BuildTime=$(BUILD_TIME) -X github.com/markb/supalite/cmd.GitCommit=$(GIT_COMMIT)"
 
-build:
+build-dashboard:
+	@echo "Building dashboard frontend..."
+	cd dashboard && npm run build
+
+build-go:
 	go build $(LDFLAGS) -o $(BINARY) .
+
+build: build-dashboard build-go
 
 run: build
 	./$(BINARY) serve

@@ -1,13 +1,18 @@
 package dashboard
 
 import (
-	"context"
+	"embed"
+	"io/fs"
 	"net/http"
+	"context"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/markb/supalite/internal/log"
 )
+
+//go:embed all:../../dashboard/dist
+var dashboardFS embed.FS
 
 // Server represents the dashboard HTTP server.
 //
@@ -52,11 +57,18 @@ type Config struct {
 func NewServer(cfg Config) *Server {
 	jwtManager := NewJWTManager([]byte(cfg.JWTSecret))
 
+	// Create sub FS that removes the dashboard/dist prefix for serving
+	distFS, err := fs.Sub(dashboardFS, "dashboard/dist")
+	if err != nil {
+		// Fallback to empty FS if embed fails (development mode)
+		distFS = http.Dir("")
+	}
+
 	return &Server{
 		router:      chi.NewRouter(),
 		jwtManager:  jwtManager,
 		pgConnector: cfg.PGDatabase,
-		staticFS:    http.Dir("dashboard"), // Placeholder for static files
+		staticFS:    http.FS(distFS),
 	}
 }
 
