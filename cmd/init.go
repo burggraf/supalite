@@ -72,16 +72,22 @@ var initCmd = &cobra.Command{
 			fmt.Println()
 			fmt.Println("No admin users found. Let's create the first admin user.")
 
-			reader := prompt.NewReader()
-			email := reader.Email("Email", "", "", true)
-			password := reader.Password("Password", "")
+			email, err := prompt.Email("Email")
+			if err != nil {
+				return fmt.Errorf("failed to read email: %w", err)
+			}
+
+			password, err := prompt.Password("Password")
+			if err != nil {
+				return fmt.Errorf("failed to read password: %w", err)
+			}
 
 			if password == "" {
 				return fmt.Errorf("password cannot be empty")
 			}
 
 			// Confirm password
-			if err := reader.ConfirmPassword("Confirm password", password); err != nil {
+			if err := prompt.ConfirmPassword("Confirm password", password); err != nil {
 				return err
 			}
 
@@ -124,6 +130,40 @@ func initSchema(ctx context.Context, db *pg.EmbeddedDatabase) error {
 		CREATE SCHEMA IF NOT EXISTS auth;
 		CREATE SCHEMA IF NOT EXISTS storage;
 		CREATE SCHEMA IF NOT EXISTS public;
+		CREATE SCHEMA IF NOT EXISTS admin;
+
+		-- Admin users table for dashboard authentication
+		CREATE TABLE IF NOT EXISTS admin.users (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			email TEXT NOT NULL UNIQUE,
+			password_hash TEXT NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		);
+
+		CREATE INDEX IF NOT EXISTS admin_users_email_idx
+			ON admin.users(email);
+
+		-- Captured emails table for development/testing
+		CREATE TABLE IF NOT EXISTS public.captured_emails (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			from_addr TEXT NOT NULL,
+			to_addr TEXT NOT NULL,
+			subject TEXT,
+			text_body TEXT,
+			html_body TEXT,
+			raw_message BYTEA
+		);
+
+		CREATE INDEX IF NOT EXISTS captured_emails_created_at_idx
+			ON public.captured_emails(created_at DESC);
+
+		CREATE INDEX IF NOT EXISTS captured_emails_to_addr_idx
+			ON public.captured_emails(to_addr);
+
+		-- Enable Row Level Security (mail capture server connects as superuser, bypasses RLS)
+		ALTER TABLE public.captured_emails ENABLE ROW LEVEL SECURITY;
 	`)
 	return err
 }
