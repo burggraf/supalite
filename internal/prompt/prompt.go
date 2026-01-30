@@ -1,7 +1,7 @@
 // Package prompt provides interactive prompt functions for user input.
 //
 // This package provides utilities for prompting users for input via stdin,
-// with support for string, password, and confirmation prompts.
+// with support for email, password, and password confirmation prompts.
 package prompt
 
 import (
@@ -9,94 +9,74 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"golang.org/x/term"
 )
 
-// Reader is the interface for reading user input.
-type Reader struct {
-	reader *bufio.Reader
-}
-
-// NewReader creates a new prompt reader.
-func NewReader() *Reader {
-	return &Reader{
-		reader: bufio.NewReader(os.Stdin),
-	}
-}
-
-// String prompts the user for a string value.
+// Email prompts the user for an email address with basic validation.
 //
 // Parameters:
-//   - label: The prompt label/text
-//   - current: The current value (if any)
-//   - defaultVal: The default value if user presses enter
+//   - prompt: The prompt text to display
 //
-// Returns the user's input or the default value.
-func (r *Reader) String(label, current, defaultVal string) string {
-	if current != "" {
-		defaultVal = current
-	}
+// Returns the user's input or an error if reading fails.
+// Will reprompt if user provides invalid email format.
+func Email(prompt string) (string, error) {
+	reader := bufio.NewReader(os.Stdin)
 
-	prompt := fmt.Sprintf("%s", label)
-	if defaultVal != "" {
-		prompt += fmt.Sprintf(" [%s]", defaultVal)
-	}
-	prompt += ": "
+	for {
+		fmt.Printf("%s: ", prompt)
 
-	fmt.Print(prompt)
-	input, _ := r.reader.ReadString('\n')
-	input = strings.TrimSpace(input)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("failed to read input: %w", err)
+		}
 
-	if input == "" {
-		return defaultVal
+		input = strings.TrimSpace(input)
+
+		// Basic email validation
+		if !strings.Contains(input, "@") || !strings.Contains(input, ".") {
+			fmt.Println("Please enter a valid email address.")
+			continue
+		}
+
+		return input, nil
 	}
-	return input
 }
 
 // Password prompts the user for a password (input is hidden).
 //
 // Parameters:
-//   - label: The prompt label/text
-//   - current: The current value (if any)
+//   - prompt: The prompt text to display
 //
-// Returns the user's input or empty string if user presses enter.
-// Note: On most terminals, this will NOT hide input - for better security
-// consider using a terminal-aware library like gopass.
-func (r *Reader) Password(label, current string) string {
-	defaultVal := current
+// Returns the user's input or an error if reading fails.
+// Uses terminal raw mode to hide password input.
+func Password(prompt string) (string, error) {
+	fmt.Printf("%s: ", prompt)
 
-	prompt := fmt.Sprintf("%s", label)
-	if defaultVal != "" {
-		prompt += fmt.Sprintf(" [****]")
+	password, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		return "", fmt.Errorf("failed to read password: %w", err)
 	}
-	prompt += ": "
 
-	fmt.Print(prompt)
-	input, _ := r.reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-
-	if input == "" {
-		return defaultVal
-	}
-	return input
+	fmt.Println() // Add newline after password input
+	return string(password), nil
 }
 
 // ConfirmPassword prompts the user to confirm a password.
 //
-// Parameters:
-//   - label: The prompt label/text
-//   - password: The password to confirm
-//
-// Returns the confirmed password or an error if they don't match.
 // The function will reprompt up to 3 times if passwords don't match.
-func (r *Reader) ConfirmPassword(label, password string) error {
+//
+// Returns an error if passwords don't match after max attempts.
+func ConfirmPassword(prompt string, password string) error {
 	const maxAttempts = 3
 
 	for i := 0; i < maxAttempts; i++ {
-		fmt.Printf("%s: ", label)
-		input, _ := r.reader.ReadString('\n')
-		input = strings.TrimSpace(input)
+		confirm, err := Password(prompt)
+		if err != nil {
+			return err
+		}
 
-		if input == password {
+		if confirm == password {
 			return nil
 		}
 
@@ -106,65 +86,4 @@ func (r *Reader) ConfirmPassword(label, password string) error {
 	}
 
 	return fmt.Errorf("password confirmation failed after %d attempts", maxAttempts)
-}
-
-// Bool prompts the user for a yes/no value.
-//
-// Parameters:
-//   - label: The prompt label/text
-//   - current: The current value (if any)
-//   - defaultVal: The default value if user presses enter
-//
-// Returns true if user enters y/yes, false if n/no or default.
-func (r *Reader) Bool(label string, current, defaultVal bool) bool {
-	defaultValStr := "n"
-	if defaultVal {
-		defaultValStr = "y"
-	}
-
-	prompt := fmt.Sprintf("%s", label)
-	prompt += fmt.Sprintf(" [%s]", defaultValStr)
-	prompt += ": "
-
-	fmt.Print(prompt)
-	input, _ := r.reader.ReadString('\n')
-	input = strings.TrimSpace(strings.ToLower(input))
-
-	if input == "" {
-		return defaultVal
-	}
-	return input == "y" || input == "yes"
-}
-
-// Email prompts the user for an email address with basic validation.
-//
-// Parameters:
-//   - label: The prompt label/text
-//   - current: The current value (if any)
-//   - defaultVal: The default value if user presses enter
-//   - required: Whether the email is required (non-empty)
-//
-// Returns the user's input or the default value.
-// Will reprompt if required and user provides empty input.
-func (r *Reader) Email(label, current, defaultVal string, required bool) string {
-	for {
-		value := r.String(label, current, defaultVal)
-
-		if value == "" && !required {
-			return value
-		}
-
-		if value == "" && required {
-			fmt.Println("Email is required. Please enter an email address.")
-			continue
-		}
-
-		// Basic email validation
-		if !strings.Contains(value, "@") || !strings.Contains(value, ".") {
-			fmt.Println("Please enter a valid email address.")
-			continue
-		}
-
-		return value
-	}
 }

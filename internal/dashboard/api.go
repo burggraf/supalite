@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -382,16 +384,36 @@ func (s *Server) handleListTables(w http.ResponseWriter, r *http.Request) {
 // The dashboard is embedded in the binary using Go's embed.FS directive,
 // which packages the entire dashboard/dist directory at compile time.
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
-	// Serve static files using the embedded filesystem
-	fileServer := http.FileServer(s.staticFS)
+	// Remove leading slash for fs.FS
+	requestPath := strings.TrimPrefix(r.URL.Path, "/")
 
-	// If the path is root or a directory, serve index.html
-	// This supports client-side routing in React
-	if r.URL.Path == "/" || r.URL.Path == "" {
-		r.URL.Path = "/index.html"
+	// For root or client-side routes, serve index.html
+	// Check if it's a static asset (has a file extension)
+	if requestPath == "" || requestPath == "/" || !strings.Contains(requestPath, ".") {
+		// This is a client-side route or root - serve index.html
+		requestPath = "index.html"
 	}
 
-	fileServer.ServeHTTP(w, r)
+	log.Info("handleStatic", "original_path", r.URL.Path, "serving", requestPath)
+
+	// Read file from embedded filesystem
+	data, err := fs.ReadFile(s.embedFS, requestPath)
+	if err != nil {
+		log.Error("failed to read file", "path", requestPath, "error", err)
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	// Determine content type
+	contentType := "text/html; charset=utf-8"
+	if strings.HasSuffix(requestPath, ".js") {
+		contentType = "application/javascript; charset=utf-8"
+	} else if strings.HasSuffix(requestPath, ".css") {
+		contentType = "text/css; charset=utf-8"
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.Write(data)
 }
 
 // handleGetTableSchema returns the schema for a specific table.

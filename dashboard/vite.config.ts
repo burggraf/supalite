@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  base: '/_/',  // Dashboard is mounted at /_/ in the Go server
   server: {
     port: 5173,
     proxy: {

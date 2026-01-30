@@ -295,8 +295,19 @@ func (s *Server) setupRoutes() {
 	// Proxy requests to GoTrue auth server
 	s.router.HandleFunc("/auth/v1/*", s.handleAuthRequest)
 
-	// Mount dashboard server at /_
-	s.router.Mount("/_", s.dashboardServer.Handler())
+	// Redirect /_ to /_/ (trailing slash)
+	s.router.Get("/_", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/_/", http.StatusMovedPermanently)
+	})
+
+	// Dashboard routes - handle all /_/ paths by stripping the prefix
+	s.router.HandleFunc("/_/*", func(w http.ResponseWriter, r *http.Request) {
+		log.Info("dashboard request", "path", r.URL.Path)
+		// Strip the /_/ prefix
+		r.URL.Path = "/" + strings.TrimPrefix(r.URL.Path, "/_/")
+		log.Info("dashboard request", "stripped_path", r.URL.Path)
+		s.dashboardServer.Handler().ServeHTTP(w, r)
+	})
 }
 
 // corsHandler returns a CORS-wrapped handler for the router

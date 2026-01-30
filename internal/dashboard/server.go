@@ -22,7 +22,8 @@ type Server struct {
 	router       *chi.Mux
 	jwtManager   *JWTManager
 	pgConnector  PostgresConnector
-	staticFS     http.FileSystem
+	staticFS     http.FileSystem  // HTTP-compatible filesystem
+	embedFS      fs.FS            // Original embedded filesystem for fs.ReadFile
 }
 
 // PostgresConnector defines the interface for connecting to PostgreSQL.
@@ -65,12 +66,19 @@ func NewServer(cfg Config) *Server {
 		distFS = dashboardFS
 	}
 
-	return &Server{
-		router:      chi.NewRouter(),
+	router := chi.NewRouter()
+	s := &Server{
+		router:      router,
 		jwtManager:  jwtManager,
 		pgConnector: cfg.PGDatabase,
 		staticFS:    http.FS(distFS),
+		embedFS:     distFS,  // Store the original fs.FS for fs.ReadFile
 	}
+
+	// Setup routes immediately after creating the server
+	s.setupRoutes()
+
+	return s
 }
 
 // setupRoutes configures all HTTP routes for the dashboard.
@@ -95,8 +103,12 @@ func (s *Server) setupRoutes() {
 		r.Get("/api/tables/{tableName}/schema", s.handleGetTableSchema)
 	})
 
-	// Static file serving
-	s.router.Get("/*", s.handleStatic)
+	// Static file serving - handle both root and all other paths
+	// Use a middleware to catch all remaining requests
+	s.router.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
+		log.Info("dashboard static request", "path", r.URL.Path)
+		s.handleStatic(w, r)
+	})
 }
 
 // authMiddleware validates JWT tokens for protected routes.
@@ -144,14 +156,8 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 
 // Handler returns the HTTP handler for the dashboard server.
 //
-// This method initializes routes if not already done and returns
-// the Chi router for use with http.ServeMux or direct mounting.
-//
-// Returns the main HTTP handler for the dashboard.
+// Returns the Chi router for use with http.ServeMux or direct mounting.
+// Routes are already initialized in NewServer.
 func (s *Server) Handler() http.Handler {
-	if s.router == nil {
-		s.router = chi.NewRouter()
-		s.setupRoutes()
-	}
 	return s.router
 }

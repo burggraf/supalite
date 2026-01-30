@@ -6,7 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
   return (
-    <Router>
+    <Router basename="/_">
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route

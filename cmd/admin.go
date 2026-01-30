@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -74,24 +75,31 @@ func runAdminAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Prompt for email and password
-	reader := prompt.NewReader()
-	email := reader.Email("Email", "", "", true)
-	password := reader.Password("Password", "")
+	// Prompt for email
+	email, err := prompt.Email("Email")
+	if err != nil {
+		return fmt.Errorf("failed to read email: %w", err)
+	}
+
+	// Prompt for password
+	password, err := prompt.Password("Password")
+	if err != nil {
+		return fmt.Errorf("failed to read password: %w", err)
+	}
 
 	if password == "" {
 		return fmt.Errorf("password cannot be empty")
 	}
 
 	// Confirm password
-	if err := reader.ConfirmPassword("Confirm password", password); err != nil {
+	if err := prompt.ConfirmPassword("Confirm password", password); err != nil {
 		return err
 	}
 
 	fmt.Println()
 
 	// Connect to database
-	db, conn, ctx, cleanup, err := connectToDatabase(cfg)
+	conn, ctx, cleanup, err := connectToDatabase(cfg)
 	if err != nil {
 		return err
 	}
@@ -108,7 +116,6 @@ func runAdminAdd(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  ID: %s\n", user.ID)
 	fmt.Printf("  Created: %s\n", user.CreatedAt.Format(time.RFC3339))
 
-	db.Stop()
 	return nil
 }
 
@@ -125,24 +132,31 @@ func runAdminChangePassword(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Prompt for email and new password
-	reader := prompt.NewReader()
-	email := reader.Email("Email", "", "", true)
-	newPassword := reader.Password("New password", "")
+	// Prompt for email
+	email, err := prompt.Email("Email")
+	if err != nil {
+		return fmt.Errorf("failed to read email: %w", err)
+	}
+
+	// Prompt for new password
+	newPassword, err := prompt.Password("New password")
+	if err != nil {
+		return fmt.Errorf("failed to read password: %w", err)
+	}
 
 	if newPassword == "" {
 		return fmt.Errorf("password cannot be empty")
 	}
 
 	// Confirm password
-	if err := reader.ConfirmPassword("Confirm new password", newPassword); err != nil {
+	if err := prompt.ConfirmPassword("Confirm new password", newPassword); err != nil {
 		return err
 	}
 
 	fmt.Println()
 
 	// Connect to database
-	db, conn, ctx, cleanup, err := connectToDatabase(cfg)
+	conn, ctx, cleanup, err := connectToDatabase(cfg)
 	if err != nil {
 		return err
 	}
@@ -155,7 +169,6 @@ func runAdminChangePassword(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("✓ Password updated successfully for: %s\n", email)
 
-	db.Stop()
 	return nil
 }
 
@@ -173,14 +186,18 @@ func runAdminDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prompt for email
-	reader := prompt.NewReader()
-	email := reader.Email("Email", "", "", true)
+	email, err := prompt.Email("Email")
+	if err != nil {
+		return fmt.Errorf("failed to read email: %w", err)
+	}
 
 	fmt.Println()
 
 	// Confirm deletion
-	confirm := reader.Bool("Are you sure you want to delete this user?", false, false)
-	if !confirm {
+	fmt.Print("Are you sure you want to delete this user? (y/N): ")
+	var confirm string
+	fmt.Scanln(&confirm)
+	if strings.ToLower(confirm) != "y" && strings.ToLower(confirm) != "yes" {
 		fmt.Println("Deletion cancelled.")
 		return nil
 	}
@@ -188,7 +205,7 @@ func runAdminDelete(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	// Connect to database
-	db, conn, ctx, cleanup, err := connectToDatabase(cfg)
+	conn, ctx, cleanup, err := connectToDatabase(cfg)
 	if err != nil {
 		return err
 	}
@@ -201,7 +218,6 @@ func runAdminDelete(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("✓ Admin user deleted: %s\n", email)
 
-	db.Stop()
 	return nil
 }
 
@@ -219,7 +235,7 @@ func runAdminList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Connect to database
-	db, conn, ctx, cleanup, err := connectToDatabase(cfg)
+	conn, ctx, cleanup, err := connectToDatabase(cfg)
 	if err != nil {
 		return err
 	}
@@ -236,7 +252,6 @@ func runAdminList(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 		fmt.Println("Create an admin user with:")
 		fmt.Println("  ./supalite admin add")
-		db.Stop()
 		return nil
 	}
 
@@ -250,12 +265,11 @@ func runAdminList(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 	}
 
-	db.Stop()
 	return nil
 }
 
 // connectToDatabase establishes a connection to the embedded database
-func connectToDatabase(cfg *config.Config) (*pg.EmbeddedDatabase, *pgx.Conn, context.Context, func(), error) {
+func connectToDatabase(cfg *config.Config) (*pgx.Conn, context.Context, func(), error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 
 	// Create embedded database config
@@ -273,7 +287,7 @@ func connectToDatabase(cfg *config.Config) (*pg.EmbeddedDatabase, *pgx.Conn, con
 	fmt.Printf("Starting database...\n")
 	if err := db.Start(ctx); err != nil {
 		cancel()
-		return nil, nil, nil, nil, fmt.Errorf("failed to start database: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to start database: %w", err)
 	}
 
 	// Connect to database
@@ -281,14 +295,15 @@ func connectToDatabase(cfg *config.Config) (*pg.EmbeddedDatabase, *pgx.Conn, con
 	if err != nil {
 		cancel()
 		db.Stop()
-		return nil, nil, nil, nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	// Cleanup function
 	cleanup := func() {
 		conn.Close(ctx)
+		db.Stop()
 		cancel()
 	}
 
-	return db, conn, ctx, cleanup, nil
+	return conn, ctx, cleanup, nil
 }

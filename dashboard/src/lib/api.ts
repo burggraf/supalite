@@ -1,4 +1,4 @@
-const API_BASE = '/api'
+const API_BASE = '/_/api'
 
 // Token management
 export const getToken = (): string | null => {
@@ -30,7 +30,7 @@ export const authFetch = async (url: string, options: RequestInit = {}): Promise
   if (response.status === 401) {
     // Token expired or invalid - redirect to login
     removeToken()
-    window.location.href = '/login'
+    window.location.href = '/_/login'
     throw new Error('Unauthorized')
   }
 
@@ -59,7 +59,7 @@ export const api = {
 
   logout: () => {
     removeToken()
-    window.location.href = '/login'
+    window.location.href = '/_/login'
   },
 
   me: async () => {
