@@ -4,6 +4,7 @@ A lightweight, single-binary backend providing Supabase-compatible functionality
 - **Embedded PostgreSQL** (no external database required)
 - **pREST** for PostgREST-compatible REST API
 - **Supabase Auth (GoTrue)** for authentication
+- **Admin Dashboard** - Web-based interface for database management and monitoring
 
 ## Features
 
@@ -12,6 +13,7 @@ A lightweight, single-binary backend providing Supabase-compatible functionality
 - **Supabase-Compatible APIs** - Drop-in replacement for many Supabase use cases
 - **Auth API** - Full Supabase Auth compatibility via GoTrue (`/auth/v1/*`)
 - **REST API** - PostgREST-compatible API for direct database access (`/rest/v1/*`)
+- **Admin Dashboard** - Web UI at `/_/` for database management and monitoring
 - **ES256 JWT Signing** - Modern asymmetric key cryptography for API tokens (default)
 - **Legacy HS256 Support** - Backward compatible with JWT_SECRET configuration
 - **JWKS Endpoint** - Public key discovery for JWT verification (`/.well-known/jwks.json`)
@@ -135,6 +137,80 @@ If you want to initialize the database separately:
 **Note:** The `init` command creates a `supalite.json` configuration file with **mail capture mode enabled by default**. This means you can immediately start developing and testing authentication flows without needing to configure SMTP. Emails sent by GoTrue will be captured to the `captured_emails` table for inspection.
 
 To configure external SMTP later, run `./supalite config email`.
+
+## Admin Dashboard
+
+Supalite includes a web-based admin dashboard for managing your database, viewing system status, and monitoring authentication. The dashboard is embedded directly in the binary and requires no separate installation.
+
+### Quick Access
+
+Once your server is running, access the dashboard at:
+
+```
+http://localhost:8080/_/
+```
+
+### First-Time Setup
+
+When you run `./supalite init`, you'll be prompted to create the first admin user. Use these credentials to log in to the dashboard.
+
+### Dashboard Features
+
+- **Overview Page**: System status, API keys, database info, and quick stats
+- **Tables Page**: Browse and manage database tables (view data, inspect schemas)
+- **Settings Page**: Server configuration and system information
+- **Authentication**: View GoTrue status and email configuration
+
+### Managing Admin Users
+
+```bash
+# List all admin users
+./supalite admin list
+
+# Add a new admin user
+./supalite admin add
+
+# Change admin password
+./supalite admin change-password
+
+# Delete an admin user
+./supalite admin delete
+```
+
+### Development Mode
+
+For active dashboard development, run the frontend separately with hot-reload:
+
+```bash
+# Terminal 1: Backend
+make serve
+
+# Terminal 2: Frontend dev server
+cd dashboard
+npm install  # First time only
+npm run dev  # Access at http://localhost:5173
+```
+
+### Production Build
+
+The dashboard is embedded in the binary during build:
+
+```bash
+make build  # Builds dashboard then Go binary
+./supalite serve  # Dashboard embedded at http://localhost:8080/_/
+```
+
+### Troubleshooting
+
+**Blank page or 404:**
+- Ensure dashboard was built: `ls internal/dashboard/dist`
+- Rebuild if needed: `cd dashboard && npm run build && cd .. && make build`
+
+**Login issues:**
+- Verify admin user exists: `./supalite admin list`
+- Reset password: `./supalite admin change-password`
+
+For comprehensive documentation on the dashboard, including troubleshooting, security best practices, and development workflow, see [docs/dashboard.md](docs/dashboard.md).
 
 ## Authentication & API Keys
 

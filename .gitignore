@@ -5,3 +5,4 @@ gotrue
 node_modules
 release/
 internal/dashboard/dist/
+dashboard/dist/
