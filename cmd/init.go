@@ -7,8 +7,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/markb/supalite/internal/admin"
 	"github.com/markb/supalite/internal/config"
 	"github.com/markb/supalite/internal/pg"
+	"github.com/markb/supalite/internal/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -48,6 +50,51 @@ var initCmd = &cobra.Command{
 
 		if err := initSchema(ctx, database); err != nil {
 			return fmt.Errorf("failed to initialize schema: %w", err)
+		}
+
+		// Check if we need to create the first admin user
+		conn, err := database.Connect(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to connect to database: %w", err)
+		}
+		defer conn.Close(ctx)
+
+		count, err := admin.Count(ctx, conn)
+		if err != nil {
+			return fmt.Errorf("failed to check admin users: %w", err)
+		}
+
+		if count == 0 {
+			fmt.Println()
+			fmt.Println("===========================================")
+			fmt.Println("Create First Admin User")
+			fmt.Println("===========================================")
+			fmt.Println()
+			fmt.Println("No admin users found. Let's create the first admin user.")
+
+			reader := prompt.NewReader()
+			email := reader.Email("Email", "", "", true)
+			password := reader.Password("Password", "")
+
+			if password == "" {
+				return fmt.Errorf("password cannot be empty")
+			}
+
+			// Confirm password
+			if err := reader.ConfirmPassword("Confirm password", password); err != nil {
+				return err
+			}
+
+			fmt.Println()
+
+			user, err := admin.Create(ctx, conn, email, password)
+			if err != nil {
+				return fmt.Errorf("failed to create admin user: %w", err)
+			}
+
+			fmt.Printf("✓ First admin user created successfully!\n")
+			fmt.Printf("  Email: %s\n", user.Email)
+			fmt.Println()
 		}
 
 		// Create supalite.json with capture mode enabled by default
