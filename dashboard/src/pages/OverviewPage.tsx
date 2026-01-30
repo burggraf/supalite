@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
+import Header from '../components/Header'
 import StatusCard from '../components/StatusCard'
 import ApiKeyCard from '../components/ApiKeyCard'
 
@@ -22,18 +23,21 @@ interface TablesResponse {
 function OverviewPage() {
   const [status, setStatus] = useState<StatusResponse | null>(null)
   const [tables, setTables] = useState<TablesResponse | null>(null)
+  const [userEmail, setUserEmail] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [statusData, tablesData] = await Promise.all([
+        const [statusData, tablesData, userData] = await Promise.all([
           api.getStatus(),
           api.getTables(),
+          api.me(),
         ])
         setStatus(statusData)
         setTables(tablesData)
+        setUserEmail(userData.email)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load data')
       } finally {
@@ -63,7 +67,9 @@ function OverviewPage() {
   const totalRows = tables?.tables.reduce((sum, t) => sum + (t.rows || 0), 0) || 0
 
   return (
-    <div>
+    <>
+      <Header userEmail={userEmail} />
+      <div>
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
@@ -135,6 +141,7 @@ function OverviewPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }
 
