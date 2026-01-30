@@ -1685,6 +1685,19 @@ func (s *Server) initSchema(ctx context.Context) error {
 		CREATE SCHEMA IF NOT EXISTS auth;
 		CREATE SCHEMA IF NOT EXISTS storage;
 		CREATE SCHEMA IF NOT EXISTS public;
+		CREATE SCHEMA IF NOT EXISTS admin;
+
+		-- Admin users table for dashboard authentication
+		CREATE TABLE IF NOT EXISTS admin.users (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			email TEXT NOT NULL UNIQUE,
+			password_hash TEXT NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		);
+
+		CREATE INDEX IF NOT EXISTS admin_users_email_idx
+			ON admin.users(email);
 
 		-- Captured emails table for development/testing
 		CREATE TABLE IF NOT EXISTS public.captured_emails (
