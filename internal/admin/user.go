@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/markb/supalite/internal/pg"
 )
 
 // User represents an admin user
@@ -155,4 +156,70 @@ func Count(ctx context.Context, conn *pgx.Conn) (int, error) {
 		return 0, fmt.Errorf("failed to count users: %w", err)
 	}
 	return count, nil
+}
+
+// ConnectToDatabase establishes a connection to the database.
+//
+// It first tries to connect to an already-running database instance.
+// If that fails, it starts a new embedded database.
+//
+// This allows admin commands to work whether the main server is running or not.
+//
+// Parameters:
+//   - port: PostgreSQL port
+//   - username: Database username
+//   - password: Database password
+//   - database: Database name
+//   - dataDir: Data directory for embedded database
+//
+// Returns the connection, a cleanup function, and an error.
+func ConnectToDatabase(port int, username, password, database, dataDir string) (*pgx.Conn, func(), error) {
+	ctx := context.Background()
+
+	// First, try to connect to an already-running database
+	connURL := fmt.Sprintf("postgres://%s:%s@localhost:%d/%s", username, password, port, database)
+	conn, err := pgx.Connect(ctx, connURL)
+	if err == nil {
+		// Successfully connected to running database
+		cleanup := func() {
+			conn.Close(ctx)
+		}
+		return conn, cleanup, nil
+	}
+
+	// Connection failed, try starting a new embedded database
+	dbCfg := pg.Config{
+		Port:        uint16(port),
+		Username:    username,
+		Password:    password,
+		Database:    database,
+		RuntimePath: dataDir,
+	}
+
+	db := pg.NewEmbeddedDatabase(dbCfg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+
+	// Start database
+	if err := db.Start(ctx); err != nil {
+		cancel()
+		return nil, nil, fmt.Errorf("failed to start database: %w", err)
+	}
+
+	// Connect to database
+	conn, err = db.Connect(ctx)
+	if err != nil {
+		cancel()
+		db.Stop()
+		return nil, nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Cleanup function
+	cleanup := func() {
+		conn.Close(ctx)
+		db.Stop()
+		cancel()
+	}
+
+	return conn, cleanup, nil
 }

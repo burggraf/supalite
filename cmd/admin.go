@@ -6,10 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/markb/supalite/internal/admin"
 	"github.com/markb/supalite/internal/config"
-	"github.com/markb/supalite/internal/pg"
 	"github.com/markb/supalite/internal/prompt"
 	"github.com/spf13/cobra"
 )
@@ -99,13 +97,14 @@ func runAdminAdd(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	// Connect to database
-	conn, ctx, cleanup, err := connectToDatabase(cfg)
+	conn, cleanup, err := admin.ConnectToDatabase(int(cfg.PGPort), cfg.PGUsername, cfg.PGPassword, cfg.PGDatabase, cfg.DataDir)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 
 	// Create user
+	ctx := context.Background()
 	user, err := admin.Create(ctx, conn, email, password)
 	if err != nil {
 		return fmt.Errorf("failed to create admin user: %w", err)
@@ -156,13 +155,14 @@ func runAdminChangePassword(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	// Connect to database
-	conn, ctx, cleanup, err := connectToDatabase(cfg)
+	conn, cleanup, err := admin.ConnectToDatabase(int(cfg.PGPort), cfg.PGUsername, cfg.PGPassword, cfg.PGDatabase, cfg.DataDir)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 
 	// Update password
+	ctx := context.Background()
 	if err := admin.UpdatePassword(ctx, conn, email, newPassword); err != nil {
 		return fmt.Errorf("failed to update password: %w", err)
 	}
@@ -205,13 +205,14 @@ func runAdminDelete(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	// Connect to database
-	conn, ctx, cleanup, err := connectToDatabase(cfg)
+	conn, cleanup, err := admin.ConnectToDatabase(int(cfg.PGPort), cfg.PGUsername, cfg.PGPassword, cfg.PGDatabase, cfg.DataDir)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 
 	// Delete user
+	ctx := context.Background()
 	if err := admin.Delete(ctx, conn, email); err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
@@ -235,13 +236,14 @@ func runAdminList(cmd *cobra.Command, args []string) error {
 	}
 
 	// Connect to database
-	conn, ctx, cleanup, err := connectToDatabase(cfg)
+	conn, cleanup, err := admin.ConnectToDatabase(int(cfg.PGPort), cfg.PGUsername, cfg.PGPassword, cfg.PGDatabase, cfg.DataDir)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 
 	// List users
+	ctx := context.Background()
 	users, err := admin.List(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("failed to list users: %w", err)
@@ -266,44 +268,4 @@ func runAdminList(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-// connectToDatabase establishes a connection to the embedded database
-func connectToDatabase(cfg *config.Config) (*pgx.Conn, context.Context, func(), error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-
-	// Create embedded database config
-	dbCfg := pg.Config{
-		Port:     cfg.PGPort,
-		Username: cfg.PGUsername,
-		Password: cfg.PGPassword,
-		Database: cfg.PGDatabase,
-		DataDir:  cfg.DataDir,
-	}
-
-	db := pg.NewEmbeddedDatabase(dbCfg)
-
-	// Start database
-	fmt.Printf("Starting database...\n")
-	if err := db.Start(ctx); err != nil {
-		cancel()
-		return nil, nil, nil, fmt.Errorf("failed to start database: %w", err)
-	}
-
-	// Connect to database
-	conn, err := db.Connect(ctx)
-	if err != nil {
-		cancel()
-		db.Stop()
-		return nil, nil, nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	// Cleanup function
-	cleanup := func() {
-		conn.Close(ctx)
-		db.Stop()
-		cancel()
-	}
-
-	return conn, ctx, cleanup, nil
 }
